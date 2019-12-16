@@ -1,5 +1,5 @@
 ﻿using Assets.ML_Agents.Examples.SharedAssets.Scripts;
-
+using Assets.ML_Agents.Examples.ClimberScripts;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -8,7 +8,6 @@ using UnityEditor;
 using ICM;
 using System.IO;
 using System.Text;
-
 using System.Diagnostics;
 
 // this code contains the high-level path planner
@@ -17,7 +16,7 @@ using System.Diagnostics;
 
 public class ClimberInterface
 {
-    enum UserCommandType { UserForwardSimulate = 0, UserNone = 1 };
+    public enum UserCommandType { UserForwardSimulate = 0, UserNone = 1 };
     
     public class UserTrajectoryPoints
     {
@@ -26,21 +25,21 @@ public class ClimberInterface
     }
     
     Vector3 lookAtPos = new Vector3();
-    Vector3 camera_pos = new Vector3(20f, -Mathf.PI / 2.0f, 0f);
+    Vector3 camera_pos = new Vector3(10f, -Mathf.PI / 2.0f, 0.0f);
     Vector3 lastMouseClicked = new Vector3();
     int current_select_state = 0;
     int selected_limb = -1;
     int selected_hold = -1;
-    UserCommandType current_command_type = UserCommandType.UserNone;
+    public UserCommandType current_command_type = UserCommandType.UserNone;
 
     List<UserTrajectoryPoints> user_trajectory_points = new List<UserTrajectoryPoints>();
 
     ClimberMechanimRig controlRig;
     SharedMemoryManager memoryManager;
-    List<EndBodyPart> connectBodyParts;
+    ContextManager masterContext;
 
     bool isTaskCompleted = true;
-    List<Transform> holdPoses;
+    //List<Transform> holdPoses;
 
     int[] init_hold_ids = { -1, -1, -1, -1 };
     int[] target_hold_ids = { -1, -1, -1, -1 };
@@ -48,12 +47,18 @@ public class ClimberInterface
     {
         controlRig = iGameInstant.GetComponentsInChildren<ClimberMechanimRig>()[0];
 
-        connectBodyParts = controlRig.GetEndBodyParts();
-        holdPoses = iGameInstant.GetComponent<ContextManager>().GetHoldTransformList();
+        masterContext = iGameInstant.GetComponent<ContextManager>();
 
         memoryManager = iMemoryManager;
+
+        AddTrajectoryPoint();
     }
     
+    public bool LoadCurrentState()
+    {
+        return controlRig.LoadState(user_trajectory_points[user_trajectory_points.Count - 1].cStateID);
+    }
+
     void AddTrajectoryPoint()
     {
         user_trajectory_points.Add(new UserTrajectoryPoints());
@@ -98,20 +103,7 @@ public class ClimberInterface
         return;
     }
 
-    void SetColorToLimb(int limb_id, Color _color)
-    {
-        connectBodyParts[limb_id]._bodyPartInfo.gameObject.GetComponent<Renderer>().material.color = _color;
-    }
-
-    void SetColorToHolds(int hold_id, Color _color)
-    {
-        _color.a = 0.25f;
-        if (hold_id > -1)
-            holdPoses[hold_id].gameObject.GetComponent<Renderer>().material.color = _color;
-        return;
-    }
-
-    void UseInterface()
+    public void UseInterface()
     {
         //Camera.main.GetComponent<CameraFollow>().flagFollowAgent = !useAgentInterface;
 
@@ -154,8 +146,13 @@ public class ClimberInterface
         if (hit)
         {
             if (hitInfo.transform.parent != null)
-                if (hitInfo.transform.parent.parent != null && hitInfo.transform.parent.parent.name != "ClimberPair")
-                    return;
+            {
+                if (hitInfo.transform.parent.name != "Environment")
+                {
+                    if (hitInfo.transform.parent.parent != null && hitInfo.transform.parent.parent.name != "Environment")
+                        return;
+                }
+            }
 
             if (current_select_state == 0)
             {
@@ -182,6 +179,7 @@ public class ClimberInterface
             }
             else
             {
+                //UnityEngine.Debug.Log(hitInfo.transform.gameObject.tag);
                 if (hitInfo.transform.gameObject.tag == "Hold")
                 {
                     HoldInfo cHoldInfo = hitInfo.transform.gameObject.GetComponent<HoldInfo>();
@@ -212,37 +210,37 @@ public class ClimberInterface
             }
         }
 
-        for (int h = 0; h < holdPoses.Count; h++)
+        for (int h = 0; h < masterContext.GetNumHolds(); h++)
         {
-            SetColorToHolds(h, Color.yellow);
+            masterContext.SetColorToHolds(h, Color.yellow);
         }
 
         for (int b = 0; b < 4; b++)
         {
-            if (user_trajectory_points[user_trajectory_points.Count - 1].target_ids[b] == connectBodyParts[b].current_hold_id)
+            if (user_trajectory_points[user_trajectory_points.Count - 1].target_ids[b] == controlRig.GetCurrentHoldBodyID(b))
             {
-                SetColorToLimb(b, Color.black);
+                controlRig.SetColorToLimb(b, Color.black);
             }
             else
             {
-                SetColorToLimb(b, Color.green);
+                controlRig.SetColorToLimb(b, Color.green);
                 if (user_trajectory_points[user_trajectory_points.Count - 1].target_ids[b] > -1)
                 {
-                    SetColorToHolds(user_trajectory_points[user_trajectory_points.Count - 1].target_ids[b], Color.green);
-                    UnityEngine.Debug.DrawLine(connectBodyParts[b]._bodyPartInfo.transform.position,
-                        holdPoses[user_trajectory_points[user_trajectory_points.Count - 1].target_ids[b]].position);
+                    masterContext.SetColorToHolds(user_trajectory_points[user_trajectory_points.Count - 1].target_ids[b], Color.green);
+                    UnityEngine.Debug.DrawLine(controlRig.GetEndBoneGlobalPosition(b),
+                        masterContext.GetHoldGlobalPosition(user_trajectory_points[user_trajectory_points.Count - 1].target_ids[b]), Color.black);
                 }
             }
         }
 
         if (selected_limb > -1)
         {
-            SetColorToLimb(selected_limb, Color.red);
+            controlRig.SetColorToLimb(selected_limb, Color.red);
         }
 
         if (selected_hold > -1)
         {
-            SetColorToHolds(selected_hold, Color.red);
+            masterContext.SetColorToHolds(selected_hold, Color.red);
         }
 
         if (Input.GetKeyDown(KeyCode.Return))
@@ -255,7 +253,7 @@ public class ClimberInterface
             //task_counter_step = counter_agent_running;
             for (int b = 0; b < 4; b++)
             {
-                init_hold_ids[b] = connectBodyParts[b].current_hold_id;
+                init_hold_ids[b] = controlRig.GetCurrentHoldBodyID(b);
                 target_hold_ids[b] = user_trajectory_points[user_trajectory_points.Count - 1].target_ids[b];
             }
             //num_spline_done = 0;
@@ -294,6 +292,8 @@ public class TrajectoryManager : MonoBehaviour
     public const bool tryNetworkConnection = false;
     private const bool _useAutoPhysicsUpdate = false;
 
+    public bool useInterface = true;
+
     public float MaxSampleDis = 0.25f;
     //public bool UsePPOReward = true;
     public bool ResetInitState = false;
@@ -303,37 +303,217 @@ public class TrajectoryManager : MonoBehaviour
     public GameObject _instantObj;
     public bool playAnimation = false;
     public Text textbox;
+    public HoldInfo.HoldType targetHoldType = HoldInfo.HoldType.Sphere;
+    public bool ToggleRandomizeScene = false;
 
     [HideInInspector]
     ContextManager mContext;
     SharedMemoryManager mMemory;
-    ClimberInterface mClimberInterface;
+    ClimberInterface mClimberInterface = null;
     
-    //LowLevelController mController;
+    LowLevelController mController;
     
     bool isTrajectoryManagerInitialized = false;
 
-    //HighLevelPlanner mHighLevelPlanner;
+    HighLevelPlanner mHighLevelPlanner = null;
     //SamplingHighLevelPlan _samplePlan = new SamplingHighLevelPlan();
 
     int cStepAnimation = 0;
 
-    //NetworkManager mNetworkManager = new NetworkManager();
+    NetworkManager mNetworkManager = new NetworkManager();
 
     // Use this for initialization
     void Start()
     {
-        //if (isTrajectoryManagerInitialized)
-        //    return;
+        if (isTrajectoryManagerInitialized)
+            return;
 
-        //IntializeTrajectoryManager();
+        IntializeTrajectoryManager();
+        
+        isTrajectoryManagerInitialized = true;
+    }
+    
+    void Update()
+    {
+        if (mNetworkManager != null && tryNetworkConnection)
+        {
+            mNetworkManager.ConnectToLocalHost();
+        }
+        
+        if (mContext.targetHoldType != targetHoldType || ToggleRandomizeScene)
+        {
+            if (ToggleRandomizeScene)
+            {
+                RandomizeSence();
+                ToggleRandomizeScene = false;
+            }
+            mContext.targetHoldType = targetHoldType;
+            // update other contexts
+            mController.CopyMasterContextToOtherContexts();
+        }
+
+        if (mClimberInterface != null)
+        {
+            mClimberInterface.UseInterface();
+
+            if (mClimberInterface.current_command_type == ClimberInterface.UserCommandType.UserNone)
+            {
+                mClimberInterface.LoadCurrentState();
+            }
+            else if (mClimberInterface.current_command_type == ClimberInterface.UserCommandType.UserForwardSimulate)
+            {
+                //
+            }
+        }
+        // this should be moved to the low-level controller
+        //if (UseAutoPhysicsUpdate)
+        //{
+        //    Physics.autoSimulation = true;
+        //    return;
+        //}
+
+        //      if (!useLowLevelRandomSamples)
+        //      {
+        //          if (mController.GetCurrentOptItr() == 0)
+        //          {
+        //              mHighLevelPlanner.RandomizeScene(Time.time);
+        //          }
+
+        //          mHighLevelPlanner.CompleteGraph();
+
+        //          if (mController.GetCurrentOptItr() == 0)
+        //          {
+        //              mHighLevelPlanner.GetRandomPlanSample(ref _samplePlan);
+        //              playAnimation = false;
+        //          }
+        //      }
+
+        //      // setting controller properties
+        //      mController.MaxSampleDis = MaxSampleDis;
+        //      mController.MaxSampleSize = MaxSampleSize;
+        //      mController.PercentFollowRef = PercentFollowRef;
+        //      //mController.UsePPOReward = UsePPOReward;
+        //      mController.PlayAnimation = playAnimation;
+
+        ////      if (ResetInitState)
+        ////      {
+        ////          ResetInitState = false;
+        ////          mController.ResetInitialStateSample();
+        ////      }
+
+        //      bool isDone = mController.OptimizeCost(ref _samplePlan);
+
+        //      if (!playAnimation)
+        //      {
+        //          if (isDone)
+        //          {
+        //              int saved_id = mHighLevelPlanner.SaveNodeState(HighLevelPlanner.SaveMode.SaveBestState, _samplePlan, !useLowLevelRandomSamples);
+        //              if (!useLowLevelRandomSamples)
+        //              {
+        //                  if (saved_id == -1) // failed
+        //                  {
+        //                      mHighLevelPlanner.AddToFailedTransitions(_samplePlan);
+        //                  }
+        //              }
+        //          }
+        //      }
+        //      else
+        //      {
+        //          LowLevelController.SamplingTrajectoryStr bestSample = mController.GetBestSample();
+
+        //          if (cStepAnimation >= bestSample._sampledMaxStep || cStepAnimation < 0)
+        //              cStepAnimation = 0;
+        //          mController.LoadState(mController.GetMasterTrajectoryIdx(), bestSample._fromToStates[cStepAnimation]);
+        //          cStepAnimation += 3;
+        //      }
+
+        //      //drawStar(_controlRigs[GetMasterTrajectoryIdx()].getEndBonePosition(0) + _controlRigs[GetMasterTrajectoryIdx()].initialBiasPosition);
+        //      //drawStar(_controlRigs[GetMasterTrajectoryIdx()].getEndBonePosition(1) + _controlRigs[GetMasterTrajectoryIdx()].initialBiasPosition);
+        //      //drawStar(_controlRigs[GetMasterTrajectoryIdx()].getEndBonePosition(2) + _controlRigs[GetMasterTrajectoryIdx()].initialBiasPosition);
+        //      //drawStar(_controlRigs[GetMasterTrajectoryIdx()].getEndBonePosition(3) + _controlRigs[GetMasterTrajectoryIdx()].initialBiasPosition);
+
+        //      textbox.text = Time.time.ToString();
+    }
+
+    void drawStar(Vector3 p)
+    {
+        float s = 0.5f;
+        UnityEngine.Debug.DrawLine(p - new Vector3(s, 0, 0), p + new Vector3(s, 0, 0), Color.red);
+        UnityEngine.Debug.DrawLine(p - new Vector3(0, s, 0), p + new Vector3(0, s, 0), Color.red);
+        UnityEngine.Debug.DrawLine(p - new Vector3(0, 0, s), p + new Vector3(0, 0, s), Color.red);
+        return;
+    }
+
+    void RandomizeSence()
+    {
+        if (useInterface)
+            mContext.RandomizeHoldPositions();
+        else
+            mHighLevelPlanner.RandomizeScene(Time.time);
+
+        return;
+    }
+
+    public void IntializeTrajectoryManager()
+    {
+        Time.fixedDeltaTime = 1 / 100.0f;
+
+        mMemory = new SharedMemoryManager();
+        mContext = _instantObj.GetComponent<ContextManager>();
+        mContext.DeactiveRandomizeFromInterface();
+        mContext.RandomizeHoldPositions();
+
+        mController = new LowLevelController(_instantObj, mMemory, mNetworkManager); //mContext
+
+        if (useInterface)
+            mClimberInterface = new ClimberInterface(_instantObj, mMemory);
+        else
+            mHighLevelPlanner = new HighLevelPlanner(mController, mMemory);
+
+        
+        //    
+
+        //    _samplePlan._sampledInitialStateSlotIdx = -1;
+
+        //    //if (useLowLevelRandomSamples && _samplePlan._sampledInitialStateSlotIdx < 0)
+        //    //{
+        //    //    _samplePlan._sampledInitialStateSlotIdx = mMemory.GetNextFreeSlotIdx();
+        //    //}
+
         //if (flag_test)
         //    TestRun();
-
-        //isTrajectoryManagerInitialized = true;
-
+        
         //mHighLevelPlanner.RandomizeScene(Time.time);
     }
+
+    public bool UseAutoPhysicsUpdate
+    {
+        get { return _useAutoPhysicsUpdate; }
+    }
+
+    //public int GetSampledInitialStateIdx(int _trajectoryIdx)
+    //{
+    //    return _samplePlan._sampledInitialStateSlotIdx;
+    //}
+
+    //public int[] GetSampledTargetStanceID(int _trajectoryIdx)
+    //{
+    //    return _samplePlan._sampledTargetStanceID;
+    //}
+
+
+    //void OnApplicationQuit()
+    //{
+    //    mNetworkManager.Close();
+
+    //    mController.FinilizeLowLevelController();
+
+    //    mHighLevelPlanner.FinalizeHighLevelPathPlanner();
+    //}
+
+    /// <summary>
+    /// testing MAES
+    /// </summary>
     bool flag_test = false;
     double frosen(double[] x, int N)
     {
@@ -353,6 +533,7 @@ public class TrajectoryManager : MonoBehaviour
         Fit = 100 * Fit1 + Fit2;
         return Fit;
     }
+
     void TestRun()
     {
         int dim = 100, gen = 1000;
@@ -378,133 +559,4 @@ public class TrajectoryManager : MonoBehaviour
             UnityEngine.Debug.Log("Generation " + (g + 1).ToString() + " => " + bestFitnessLMM.ToString());
         }
     }
-
-    
-
-    void Update()
-    {
-  //      if (mNetworkManager != null && tryNetworkConnection)
-  //      {
-  //          mNetworkManager.ConnectToLocalHost();
-  //      }
-
-  //      if (UseAutoPhysicsUpdate)
-  //      {
-  //          Physics.autoSimulation = true;
-  //          return;
-  //      }
-
-  //      if (!useLowLevelRandomSamples)
-  //      {
-  //          if (mController.GetCurrentOptItr() == 0)
-  //          {
-  //              mHighLevelPlanner.RandomizeScene(Time.time);
-  //          }
-
-  //          mHighLevelPlanner.CompleteGraph();
-
-  //          if (mController.GetCurrentOptItr() == 0)
-  //          {
-  //              mHighLevelPlanner.GetRandomPlanSample(ref _samplePlan);
-  //              playAnimation = false;
-  //          }
-  //      }
-
-  //      // setting controller properties
-  //      mController.MaxSampleDis = MaxSampleDis;
-  //      mController.MaxSampleSize = MaxSampleSize;
-  //      mController.PercentFollowRef = PercentFollowRef;
-  //      //mController.UsePPOReward = UsePPOReward;
-  //      mController.PlayAnimation = playAnimation;
-
-  ////      if (ResetInitState)
-  ////      {
-  ////          ResetInitState = false;
-  ////          mController.ResetInitialStateSample();
-  ////      }
-
-  //      bool isDone = mController.OptimizeCost(ref _samplePlan);
-
-  //      if (!playAnimation)
-  //      {
-  //          if (isDone)
-  //          {
-  //              int saved_id = mHighLevelPlanner.SaveNodeState(HighLevelPlanner.SaveMode.SaveBestState, _samplePlan, !useLowLevelRandomSamples);
-  //              if (!useLowLevelRandomSamples)
-  //              {
-  //                  if (saved_id == -1) // failed
-  //                  {
-  //                      mHighLevelPlanner.AddToFailedTransitions(_samplePlan);
-  //                  }
-  //              }
-  //          }
-  //      }
-  //      else
-  //      {
-  //          LowLevelController.SamplingTrajectoryStr bestSample = mController.GetBestSample();
-
-  //          if (cStepAnimation >= bestSample._sampledMaxStep || cStepAnimation < 0)
-  //              cStepAnimation = 0;
-  //          mController.LoadState(mController.GetMasterTrajectoryIdx(), bestSample._fromToStates[cStepAnimation]);
-  //          cStepAnimation += 3;
-  //      }
-
-  //      //drawStar(_controlRigs[GetMasterTrajectoryIdx()].getEndBonePosition(0) + _controlRigs[GetMasterTrajectoryIdx()].initialBiasPosition);
-  //      //drawStar(_controlRigs[GetMasterTrajectoryIdx()].getEndBonePosition(1) + _controlRigs[GetMasterTrajectoryIdx()].initialBiasPosition);
-  //      //drawStar(_controlRigs[GetMasterTrajectoryIdx()].getEndBonePosition(2) + _controlRigs[GetMasterTrajectoryIdx()].initialBiasPosition);
-  //      //drawStar(_controlRigs[GetMasterTrajectoryIdx()].getEndBonePosition(3) + _controlRigs[GetMasterTrajectoryIdx()].initialBiasPosition);
-
-  //      textbox.text = Time.time.ToString();
-    }
-
-    void drawStar(Vector3 p)
-    {
-        float s = 0.5f;
-        UnityEngine.Debug.DrawLine(p - new Vector3(s, 0, 0), p + new Vector3(s, 0, 0), Color.red);
-        UnityEngine.Debug.DrawLine(p - new Vector3(0, s, 0), p + new Vector3(0, s, 0), Color.red);
-        UnityEngine.Debug.DrawLine(p - new Vector3(0, 0, s), p + new Vector3(0, 0, s), Color.red);
-        return;
-    }
-
-    //public void IntializeTrajectoryManager()
-    //{
-    //    Time.fixedDeltaTime = 1 / 100.0f;
-    //    mContext = new ContextManager(_instantObj);
-    //    mMemory = new MemoryManager();
-    //    mController = new LowLevelController(_instantObj, mMemory, mNetworkManager); //mContext
-
-    //    mHighLevelPlanner = new HighLevelPlanner(mContext, mController, mMemory);
-
-    //    _samplePlan._sampledInitialStateSlotIdx = -1;
-
-    //    //if (useLowLevelRandomSamples && _samplePlan._sampledInitialStateSlotIdx < 0)
-    //    //{
-    //    //    _samplePlan._sampledInitialStateSlotIdx = mMemory.GetNextFreeSlotIdx();
-    //    //}
-    //}
-
-    //public bool UseAutoPhysicsUpdate
-    //{
-    //    get { return _useAutoPhysicsUpdate; }
-    //}
-
-    //public int GetSampledInitialStateIdx(int _trajectoryIdx)
-    //{
-    //    return _samplePlan._sampledInitialStateSlotIdx;
-    //}
-
-    //public int[] GetSampledTargetStanceID(int _trajectoryIdx)
-    //{
-    //    return _samplePlan._sampledTargetStanceID;
-    //}
-
-
-    //void OnApplicationQuit()
-    //{
-    //    mNetworkManager.Close();
-
-    //    mController.FinilizeLowLevelController();
-
-    //    mHighLevelPlanner.FinalizeHighLevelPathPlanner();
-    //}
 }

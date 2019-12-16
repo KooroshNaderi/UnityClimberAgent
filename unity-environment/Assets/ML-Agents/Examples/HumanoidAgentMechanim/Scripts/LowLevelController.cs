@@ -153,6 +153,8 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
 
         public LowLevelController(GameObject _instantObj, SharedMemoryManager iMemory, NetworkManager iNetworkManager)
         {
+            Physics.autoSimulation = false;
+
             mMemory = iMemory;
             mNetworkManager = iNetworkManager;
 
@@ -175,7 +177,7 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
                     _controlRigs.Add(_climberMechanimRig);
 
                     // g.GetComponent<MeshRenderer>().enabled = false;
-                    g.transform.position = new Vector3(i * 8.5f, 2, j * 4.5f);
+                    g.transform.position = new Vector3(i * 8.5f, 2 + 10, j * 4.5f);
                 }
             }
 
@@ -259,6 +261,11 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
             return;
         }
 
+        public void LoadToMaster(int state_id)
+        {
+            _controlRigs[GetMasterTrajectoryIdx()].LoadState(state_id);
+        }
+
         //    void ResetEnvAndTargetForForwardSimulation(int _trajectoryIdx, bool _isFirstItr, ref int[] optTragetIds)
         //    {
         //        return;
@@ -305,417 +312,417 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
         //        //return;
         //    }
 
-        //    int InitTrajectories(ref SamplingHighLevelPlan _samplePlan)
-        //    {
-        //        int curNumTrajectories = nOptimizationSamples;
-        //        // new starting state and stance target is set when opt _iter is zero
-        //        int initial_state_opt = _samplePlan._sampledInitialStateSlotIdx;
+        int InitTrajectories(ref SamplingHighLevelPlan _samplePlan)
+        {
+            int curNumTrajectories = nOptimizationSamples;
+            // new starting state and stance target is set when opt _iter is zero
+            int initial_state_opt = _samplePlan._sampledInitialStateSlotIdx;
 
-        //        // if high-level planner is not used, use a simple cyclic movement planner as follows
-        //        if (initial_state_opt < 0)
-        //        {
-        //            if (startingStateIdx < 0)
-        //            {
-        //                // start from t-pose
-        //                initial_state_opt = reset_memory_idx;
-        //            }
-        //            else
-        //            {
-        //                initial_state_opt = startingStateIdx;
-        //            }
-        //        }
+            // if high-level planner is not used, use a simple cyclic movement planner as follows
+            if (initial_state_opt < 0)
+            {
+                if (startingStateIdx < 0)
+                {
+                    // start from t-pose
+                    initial_state_opt = reset_memory_idx;
+                }
+                else
+                {
+                    initial_state_opt = startingStateIdx;
+                }
+            }
 
-        //        // our opt should create a cyclic clip of climbing, which sample stance is coming from
-        //        for (int t = 0; t < nOptimizationSamples; t++)
-        //        {
-        //            if (_trajectorySamples[t].ResetFlag)
-        //            {
-        //                if (t == 0)
-        //                {
-        //                    _controlRigs[t].loadState(initial_state_opt);
-        //                    for (int id = 0; id < 4; id++)
-        //                    {
-        //                        _trajectorySamples[t].targetHoldIds[id] = _samplePlan._sampledTargetStanceID[id];
-        //                    }
-        //                    //if (_iter == 0)
-        //                    //{
-        //                    //    // only for _iter = 0 of opt we can set the target stance with their position
-        //                    //    RandomizeHoldScence(t, initial_state_opt);
-        //                    //    SampleRandomStanceIDs(t);
-        //                    //}
-        //                }
-        //                else
-        //                {
-        //                    _controlRigs[t].loadState(_trajectorySamples[0]._startingSlotIndex);
-        //                    for (int id = 0; id < 4; id++)
-        //                    {
-        //                        _trajectorySamples[t].targetHoldIds[id] = _trajectorySamples[0].targetHoldIds[id];
-        //                    }
-        //                }
-        //                // save the scene for forward simulation
-        //                _controlRigs[t].SaveState(_trajectorySamples[t]._startingSlotIndex);
-        //                _controlRigs[t].SaveState(_trajectorySamples[t]._cSlotStateIdx);
-        //                _trajectorySamples[t].ResetFlag = false;
-        //                _trajectorySamples[t].isActionDone = true;
+            // our opt should create a cyclic clip of climbing, which sample stance is coming from
+            for (int t = 0; t < nOptimizationSamples; t++)
+            {
+                if (_trajectorySamples[t].ResetFlag)
+                {
+                    if (t == 0)
+                    {
+                        _controlRigs[t].LoadState(initial_state_opt);
+                        for (int id = 0; id < 4; id++)
+                        {
+                            _trajectorySamples[t].targetHoldIds[id] = _samplePlan._sampledTargetStanceID[id];
+                        }
+                        //if (_iter == 0)
+                        //{
+                        //    // only for _iter = 0 of opt we can set the target stance with their position
+                        //    RandomizeHoldScence(t, initial_state_opt);
+                        //    SampleRandomStanceIDs(t);
+                        //}
+                    }
+                    else
+                    {
+                        _controlRigs[t].LoadState(_trajectorySamples[0]._startingSlotIndex);
+                        for (int id = 0; id < 4; id++)
+                        {
+                            _trajectorySamples[t].targetHoldIds[id] = _trajectorySamples[0].targetHoldIds[id];
+                        }
+                    }
+                    // save the scene for forward simulation
+                    _controlRigs[t].SaveState(_trajectorySamples[t]._startingSlotIndex);
+                    _controlRigs[t].SaveState(_trajectorySamples[t]._cSlotStateIdx);
+                    _trajectorySamples[t].ResetFlag = false;
+                    _trajectorySamples[t].isActionDone = true;
 
-        //                if (_iter == 0)
-        //                {
-        //                    startingStateIdx = _trajectorySamples[0]._startingSlotIndex;
+                    if (_iter == 0)
+                    {
+                        startingStateIdx = _trajectorySamples[0]._startingSlotIndex;
 
-        //                    _trajectorySamples[t].sourcePos.Clear();
-        //                    _trajectorySamples[t].targetPos.Clear();
-        //                    for (int _h = 0; _h < _trajectorySamples[t].targetHoldIds.Length; _h++)
-        //                    {
-        //                        if (_trajectorySamples[t].targetHoldIds[_h] >= 0)
-        //                        {
-        //                            _trajectorySamples[t].sourcePos.Add((ControlledPoses)(ControlledPoses.LeftLeg + _h));
-        //                            _trajectorySamples[t].targetPos.Add(GetHoldPositionInContext(t, _trajectorySamples[t].targetHoldIds[_h]));
-        //                        }
-        //                    }
-        //                }
-        //            }
-        //            else
-        //            {
-        //                _controlRigs[t].loadState(_trajectorySamples[t]._cSlotStateIdx);
-        //            }
-        //        }
+                        _trajectorySamples[t].sourcePos.Clear();
+                        _trajectorySamples[t].targetPos.Clear();
+                        for (int _h = 0; _h < _trajectorySamples[t].targetHoldIds.Length; _h++)
+                        {
+                            if (_trajectorySamples[t].targetHoldIds[_h] >= 0)
+                            {
+                                _trajectorySamples[t].sourcePos.Add((ControlledPoses)(ControlledPoses.LeftLeg + _h));
+                                _trajectorySamples[t].targetPos.Add(_controlRigs[t].GetContextManager().GetHoldPosition(_trajectorySamples[t].targetHoldIds[_h]));
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    _controlRigs[t].LoadState(_trajectorySamples[t]._cSlotStateIdx);
+                }
+            }
 
-        //        if (_iter == 0 && nOptimizationSamples > 0)
-        //        {
-        //            //startingStateIdx = _samplePlan._sampledInitialStateSlotIdx;
-        //            //float[] state_feature = GetFeatureState(startingStateIdx, _samplePlan._sampledTargetStanceID, 0);
+            if (_iter == 0 && nOptimizationSamples > 0)
+            {
+                //startingStateIdx = _samplePlan._sampledInitialStateSlotIdx;
+                //float[] state_feature = GetFeatureState(startingStateIdx, _samplePlan._sampledTargetStanceID, 0);
 
-        //            //string network_data = "1|" + MyTools.ParseArrFloatInToString(state_feature);
-        //            //string network_message = MyTools.ParseIntoString('Q', network_data);
+                //string network_data = "1|" + MyTools.ParseArrFloatInToString(state_feature);
+                //string network_message = MyTools.ParseIntoString('Q', network_data);
 
-        //            //if (mNetworkManager.IsConnected)
-        //            //{
-        //            //    int _sampleSize = nControlPoints * (1 + nAngle /*time + nAngle*/) + 4 /*time to let go of the hands and feet*/;
-        //            //    string network_reply = mNetworkManager.Send(ref network_message);
-        //            //    bool success_try = false;
-        //            //    if (network_reply != "" && network_reply != "N/A")
-        //            //    {
-        //            //        MyTools.ParseStringIntoFloatArr(network_reply, ref predicted_policy_mean_std);
-        //            //        success_try = true;
-        //            //        if (predicted_policy_mean_std.Count == _sampleSize || predicted_policy_mean_std.Count == 2 * _sampleSize)
-        //            //        {
-        //            //            success_try = false;
-        //            //        }
-        //            //    }
+                //if (mNetworkManager.IsConnected)
+                //{
+                //    int _sampleSize = nControlPoints * (1 + nAngle /*time + nAngle*/) + 4 /*time to let go of the hands and feet*/;
+                //    string network_reply = mNetworkManager.Send(ref network_message);
+                //    bool success_try = false;
+                //    if (network_reply != "" && network_reply != "N/A")
+                //    {
+                //        MyTools.ParseStringIntoFloatArr(network_reply, ref predicted_policy_mean_std);
+                //        success_try = true;
+                //        if (predicted_policy_mean_std.Count == _sampleSize || predicted_policy_mean_std.Count == 2 * _sampleSize)
+                //        {
+                //            success_try = false;
+                //        }
+                //    }
 
-        //            //    if (!success_try)
-        //            //    {
-        //            //        predicted_policy_mean_std.Clear();
-        //            //    }
-        //            //}
-        //            //else
-        //            //{
-        //            predicted_policy_mean_std.Clear();
-        //            //}
-        //            //init opt
-        //            InitOptimization();
-        //        }
+                //    if (!success_try)
+                //    {
+                //        predicted_policy_mean_std.Clear();
+                //    }
+                //}
+                //else
+                //{
+                predicted_policy_mean_std.Clear();
+                //}
+                //init opt
+                InitOptimization();
+            }
 
-        //        return curNumTrajectories;
-        //        // Init environment for forward simulation
-        //        //if (_ReplayExpreinces)
-        //        //// in this scope we only initialize previousely recorded exps
-        //        //{
-        //        //    for (int nt = nOptimizationSamples; nt < nOptimizationSamples + nNNEvalTrajectories; nt++)
-        //        //    {
-        //        //        if (_trajectorySamples[nt].ResetFlag)
-        //        //        {
-        //        //            int rnd_index_trajectory = Random.Range(0, initial_trajectory_points.Count);
-        //        //            int state_in_trajectory_idx = Random.Range(0, (int)(initial_trajectory_points[rnd_index_trajectory]._fromToStates.Count / 5)) * 5;
-        //        //            // loading scene and climber state
-        //        //            for (int iid = 0; iid < 2; iid++)
-        //        //            {
-        //        //                int t = nt - iid * nOptimizationSamples;
+            return curNumTrajectories;
+            // Init environment for forward simulation
+            //if (_ReplayExpreinces)
+            //// in this scope we only initialize previousely recorded exps
+            //{
+            //    for (int nt = nOptimizationSamples; nt < nOptimizationSamples + nNNEvalTrajectories; nt++)
+            //    {
+            //        if (_trajectorySamples[nt].ResetFlag)
+            //        {
+            //            int rnd_index_trajectory = Random.Range(0, initial_trajectory_points.Count);
+            //            int state_in_trajectory_idx = Random.Range(0, (int)(initial_trajectory_points[rnd_index_trajectory]._fromToStates.Count / 5)) * 5;
+            //            // loading scene and climber state
+            //            for (int iid = 0; iid < 2; iid++)
+            //            {
+            //                int t = nt - iid * nOptimizationSamples;
 
-        //        //                _controlRigs[t].loadState(initial_trajectory_points[rnd_index_trajectory]._fromToStates[state_in_trajectory_idx]);
+            //                _controlRigs[t].loadState(initial_trajectory_points[rnd_index_trajectory]._fromToStates[state_in_trajectory_idx]);
 
-        //        //                // loading optimized target stance
-        //        //                for (int id = 0; id < 4; id++)
-        //        //                {
-        //        //                    _trajectorySamples[t].targetHoldIds[id] = initial_trajectory_points[rnd_index_trajectory].targetHoldIds[id];
-        //        //                }
+            //                // loading optimized target stance
+            //                for (int id = 0; id < 4; id++)
+            //                {
+            //                    _trajectorySamples[t].targetHoldIds[id] = initial_trajectory_points[rnd_index_trajectory].targetHoldIds[id];
+            //                }
 
-        //        //                if (t >= nOptimizationSamples)
-        //        //                {
-        //        //                    RandomizeHoldScence(t, initial_trajectory_points[rnd_index_trajectory]._fromToStates[state_in_trajectory_idx]);
-        //        //                }
+            //                if (t >= nOptimizationSamples)
+            //                {
+            //                    RandomizeHoldScence(t, initial_trajectory_points[rnd_index_trajectory]._fromToStates[state_in_trajectory_idx]);
+            //                }
 
-        //        //                // save the scene for forward simulation
-        //        //                _controlRigs[t].saveState(_trajectorySamples[t]._startingSlotIndex);
-        //        //                _controlRigs[t].saveState(_trajectorySamples[t]._cSlotStateIdx);
+            //                // save the scene for forward simulation
+            //                _controlRigs[t].saveState(_trajectorySamples[t]._startingSlotIndex);
+            //                _controlRigs[t].saveState(_trajectorySamples[t]._cSlotStateIdx);
 
-        //        //                _trajectorySamples[t].datum_index = rnd_index_trajectory;
-        //        //                _trajectorySamples[t]._cSimulationStep = state_in_trajectory_idx;
-        //        //                _trajectorySamples[t].ResetFlag = false;
-        //        //                _trajectorySamples[t].isActionDone = true;
+            //                _trajectorySamples[t].datum_index = rnd_index_trajectory;
+            //                _trajectorySamples[t]._cSimulationStep = state_in_trajectory_idx;
+            //                _trajectorySamples[t].ResetFlag = false;
+            //                _trajectorySamples[t].isActionDone = true;
 
-        //        //                // setting target pose for computing cost
-        //        //                _trajectorySamples[t].sourcePos.Clear();
-        //        //                _trajectorySamples[t].targetPos.Clear();
-        //        //                for (int _h = 0; _h < _trajectorySamples[t].targetHoldIds.Length; _h++)
-        //        //                {
-        //        //                    if (_trajectorySamples[t].targetHoldIds[_h] >= 0)
-        //        //                    {
-        //        //                        _trajectorySamples[t].sourcePos.Add((ControlledPoses)(ControlledPoses.LeftLeg + _h));
-        //        //                        _trajectorySamples[t].targetPos.Add(GetHoldPositionInContext(t, _trajectorySamples[t].targetHoldIds[_h]));
-        //        //                    }
-        //        //                }
+            //                // setting target pose for computing cost
+            //                _trajectorySamples[t].sourcePos.Clear();
+            //                _trajectorySamples[t].targetPos.Clear();
+            //                for (int _h = 0; _h < _trajectorySamples[t].targetHoldIds.Length; _h++)
+            //                {
+            //                    if (_trajectorySamples[t].targetHoldIds[_h] >= 0)
+            //                    {
+            //                        _trajectorySamples[t].sourcePos.Add((ControlledPoses)(ControlledPoses.LeftLeg + _h));
+            //                        _trajectorySamples[t].targetPos.Add(GetHoldPositionInContext(t, _trajectorySamples[t].targetHoldIds[_h]));
+            //                    }
+            //                }
 
-        //        //                if (t < nOptimizationSamples)
-        //        //                {
-        //        //                    _trajectorySamples[t]._sampledMaxStep = initial_trajectory_points[rnd_index_trajectory]._sampledMaxStep;
-        //        //                    for (int i = 0; i < bestPreSample._sampledAction.Length; i++)
-        //        //                    {
-        //        //                        _trajectorySamples[t]._sampledAction[i] = initial_trajectory_points[rnd_index_trajectory]._sampledAction[i];
-        //        //                    }
-        //        //                }
-        //        //            }
-        //        //        }
-        //        //        else
-        //        //        {
-        //        //            for (int iid = 0; iid < 2; iid++)
-        //        //            {
-        //        //                int t = nt - iid * nOptimizationSamples;
-        //        //                _controlRigs[t].loadState(_trajectorySamples[t]._cSlotStateIdx);
-        //        //            }
-        //        //        }
-        //        //    }
-        //        //}
-        //        // in this scope we have both opt env + neural network env
-        //        //else
-        //        //{
-        //        //// new starting state and stance target is set when opt _iter is zero
-        //        //int initial_state_opt = _samplePlan._sampledInitialStateSlotIdx;
+            //                if (t < nOptimizationSamples)
+            //                {
+            //                    _trajectorySamples[t]._sampledMaxStep = initial_trajectory_points[rnd_index_trajectory]._sampledMaxStep;
+            //                    for (int i = 0; i < bestPreSample._sampledAction.Length; i++)
+            //                    {
+            //                        _trajectorySamples[t]._sampledAction[i] = initial_trajectory_points[rnd_index_trajectory]._sampledAction[i];
+            //                    }
+            //                }
+            //            }
+            //        }
+            //        else
+            //        {
+            //            for (int iid = 0; iid < 2; iid++)
+            //            {
+            //                int t = nt - iid * nOptimizationSamples;
+            //                _controlRigs[t].loadState(_trajectorySamples[t]._cSlotStateIdx);
+            //            }
+            //        }
+            //    }
+            //}
+            // in this scope we have both opt env + neural network env
+            //else
+            //{
+            //// new starting state and stance target is set when opt _iter is zero
+            //int initial_state_opt = _samplePlan._sampledInitialStateSlotIdx;
 
-        //        //// if high-level planner is not used, use a simple cyclic movement planner as follows
-        //        //if (initial_state_opt < 0)
-        //        //{
-        //        //    if (startingStateIdx < 0)
-        //        //    {
-        //        //        // start from t-pose
-        //        //        initial_state_opt = reset_memory_idx;
-        //        //    }
-        //        //    else
-        //        //    {
-        //        //        initial_state_opt = startingStateIdx;
-        //        //    }
-        //        //}
+            //// if high-level planner is not used, use a simple cyclic movement planner as follows
+            //if (initial_state_opt < 0)
+            //{
+            //    if (startingStateIdx < 0)
+            //    {
+            //        // start from t-pose
+            //        initial_state_opt = reset_memory_idx;
+            //    }
+            //    else
+            //    {
+            //        initial_state_opt = startingStateIdx;
+            //    }
+            //}
 
-        //        //// our opt should create a cyclic clip of climbing, which sample stance is coming from
-        //        //for (int t = 0; t < nOptimizationSamples; t++)
-        //        //{
-        //        //    if (_trajectorySamples[t].ResetFlag)
-        //        //    {
-        //        //        if (t == 0)
-        //        //        {
-        //        //            _controlRigs[t].loadState(initial_state_opt);
-        //        //            if (_iter == 0)
-        //        //            {
-        //        //                // only for _iter = 0 of opt we can set the target stance with their position
-        //        //                RandomizeHoldScence(t, initial_state_opt);
-        //        //                SampleRandomStanceIDs(t);
-        //        //            }
-        //        //        }
-        //        //        else
-        //        //        {
-        //        //            _controlRigs[t].loadState(_trajectorySamples[0]._startingSlotIndex);
-        //        //            for (int id = 0; id < 4; id++)
-        //        //            {
-        //        //                _trajectorySamples[t].targetHoldIds[id] = _trajectorySamples[0].targetHoldIds[id];
-        //        //            }
-        //        //        }
-        //        //        // save the scene for forward simulation
-        //        //        _controlRigs[t].saveState(_trajectorySamples[t]._startingSlotIndex);
-        //        //        _controlRigs[t].saveState(_trajectorySamples[t]._cSlotStateIdx);
-        //        //        _trajectorySamples[t].ResetFlag = false;
-        //        //        _trajectorySamples[t].isActionDone = true;
+            //// our opt should create a cyclic clip of climbing, which sample stance is coming from
+            //for (int t = 0; t < nOptimizationSamples; t++)
+            //{
+            //    if (_trajectorySamples[t].ResetFlag)
+            //    {
+            //        if (t == 0)
+            //        {
+            //            _controlRigs[t].loadState(initial_state_opt);
+            //            if (_iter == 0)
+            //            {
+            //                // only for _iter = 0 of opt we can set the target stance with their position
+            //                RandomizeHoldScence(t, initial_state_opt);
+            //                SampleRandomStanceIDs(t);
+            //            }
+            //        }
+            //        else
+            //        {
+            //            _controlRigs[t].loadState(_trajectorySamples[0]._startingSlotIndex);
+            //            for (int id = 0; id < 4; id++)
+            //            {
+            //                _trajectorySamples[t].targetHoldIds[id] = _trajectorySamples[0].targetHoldIds[id];
+            //            }
+            //        }
+            //        // save the scene for forward simulation
+            //        _controlRigs[t].saveState(_trajectorySamples[t]._startingSlotIndex);
+            //        _controlRigs[t].saveState(_trajectorySamples[t]._cSlotStateIdx);
+            //        _trajectorySamples[t].ResetFlag = false;
+            //        _trajectorySamples[t].isActionDone = true;
 
-        //        //        if (_iter == 0)
-        //        //        {
-        //        //            startingStateIdx = _trajectorySamples[0]._startingSlotIndex;
+            //        if (_iter == 0)
+            //        {
+            //            startingStateIdx = _trajectorySamples[0]._startingSlotIndex;
 
-        //        //            _trajectorySamples[t].sourcePos.Clear();
-        //        //            _trajectorySamples[t].targetPos.Clear();
-        //        //            for (int _h = 0; _h < _trajectorySamples[t].targetHoldIds.Length; _h++)
-        //        //            {
-        //        //                if (_trajectorySamples[t].targetHoldIds[_h] >= 0)
-        //        //                {
-        //        //                    _trajectorySamples[t].sourcePos.Add((ControlledPoses)(ControlledPoses.LeftLeg + _h));
-        //        //                    _trajectorySamples[t].targetPos.Add(GetHoldPositionInContext(t, _trajectorySamples[t].targetHoldIds[_h]));
-        //        //                }
-        //        //            }
-        //        //        }
-        //        //    }
-        //        //    else
-        //        //    {
-        //        //        _controlRigs[t].loadState(_trajectorySamples[t]._cSlotStateIdx);
-        //        //    }
-        //        //}
+            //            _trajectorySamples[t].sourcePos.Clear();
+            //            _trajectorySamples[t].targetPos.Clear();
+            //            for (int _h = 0; _h < _trajectorySamples[t].targetHoldIds.Length; _h++)
+            //            {
+            //                if (_trajectorySamples[t].targetHoldIds[_h] >= 0)
+            //                {
+            //                    _trajectorySamples[t].sourcePos.Add((ControlledPoses)(ControlledPoses.LeftLeg + _h));
+            //                    _trajectorySamples[t].targetPos.Add(GetHoldPositionInContext(t, _trajectorySamples[t].targetHoldIds[_h]));
+            //                }
+            //            }
+            //        }
+            //    }
+            //    else
+            //    {
+            //        _controlRigs[t].loadState(_trajectorySamples[t]._cSlotStateIdx);
+            //    }
+            //}
 
-        //        //// for neural network, each trajectory can have its own scene
-        //        //for (int t = nOptimizationSamples; t < nOptimizationSamples + nNNEvalTrajectories; t++)
-        //        //{
-        //        //    if (_trajectorySamples[t].ResetFlag)
-        //        //    {
-        //        //        if (initial_trajectory_points.Count > 0)
-        //        //        {
-        //        //            int rnd_index_trajectory = Random.Range(0, initial_trajectory_points.Count);
-        //        //            initial_state_opt = initial_trajectory_points[rnd_index_trajectory]._startingSlotIndex;
-        //        //        }
-        //        //        _controlRigs[t].loadState(initial_state_opt);
-        //        //        // only for _iter = 0 of opt we can set the target stance with their position
-        //        //        RandomizeHoldScence(t, initial_state_opt);
-        //        //        SampleRandomStanceIDs(t);
-        //        //        // save the scene for forward simulation
-        //        //        _controlRigs[t].saveState(_trajectorySamples[t]._startingSlotIndex);
-        //        //        _controlRigs[t].saveState(_trajectorySamples[t]._cSlotStateIdx);
-        //        //        _trajectorySamples[t].ResetFlag = false;
+            //// for neural network, each trajectory can have its own scene
+            //for (int t = nOptimizationSamples; t < nOptimizationSamples + nNNEvalTrajectories; t++)
+            //{
+            //    if (_trajectorySamples[t].ResetFlag)
+            //    {
+            //        if (initial_trajectory_points.Count > 0)
+            //        {
+            //            int rnd_index_trajectory = Random.Range(0, initial_trajectory_points.Count);
+            //            initial_state_opt = initial_trajectory_points[rnd_index_trajectory]._startingSlotIndex;
+            //        }
+            //        _controlRigs[t].loadState(initial_state_opt);
+            //        // only for _iter = 0 of opt we can set the target stance with their position
+            //        RandomizeHoldScence(t, initial_state_opt);
+            //        SampleRandomStanceIDs(t);
+            //        // save the scene for forward simulation
+            //        _controlRigs[t].saveState(_trajectorySamples[t]._startingSlotIndex);
+            //        _controlRigs[t].saveState(_trajectorySamples[t]._cSlotStateIdx);
+            //        _trajectorySamples[t].ResetFlag = false;
 
-        //        //        _trajectorySamples[t].sourcePos.Clear();
-        //        //        _trajectorySamples[t].targetPos.Clear();
-        //        //        for (int _h = 0; _h < _trajectorySamples[t].targetHoldIds.Length; _h++)
-        //        //        {
-        //        //            if (_trajectorySamples[t].targetHoldIds[_h] >= 0)
-        //        //            {
-        //        //                _trajectorySamples[t].sourcePos.Add((ControlledPoses)(ControlledPoses.LeftLeg + _h));
-        //        //                _trajectorySamples[t].targetPos.Add(GetHoldPositionInContext(t, _trajectorySamples[t].targetHoldIds[_h]));
-        //        //            }
-        //        //        }
-        //        //    }
-        //        //    else
-        //        //    {
-        //        //        _controlRigs[t].loadState(_trajectorySamples[t]._cSlotStateIdx);
-        //        //    }
-        //        //}
-        //        //}
+            //        _trajectorySamples[t].sourcePos.Clear();
+            //        _trajectorySamples[t].targetPos.Clear();
+            //        for (int _h = 0; _h < _trajectorySamples[t].targetHoldIds.Length; _h++)
+            //        {
+            //            if (_trajectorySamples[t].targetHoldIds[_h] >= 0)
+            //            {
+            //                _trajectorySamples[t].sourcePos.Add((ControlledPoses)(ControlledPoses.LeftLeg + _h));
+            //                _trajectorySamples[t].targetPos.Add(GetHoldPositionInContext(t, _trajectorySamples[t].targetHoldIds[_h]));
+            //            }
+            //        }
+            //    }
+            //    else
+            //    {
+            //        _controlRigs[t].loadState(_trajectorySamples[t]._cSlotStateIdx);
+            //    }
+            //}
+            //}
 
-        //        //List<float[]> trajetories_feature_states = new List<float[]>();
-        //        //// get a couple of init state - proposed actions from neural net to evalue them
-        //        //if (mNetworkManager.IsConnected && nNNEvalTrajectories > 0 && _ReplayExpreinces)
-        //        //{
-        //        //    for (int i = 0; i < nNNEvalTrajectories; i++)
-        //        //    {
-        //        //        float[] featureState = GetFeatureState(_trajectorySamples[nOptimizationSamples + i]._startingSlotIndex,
-        //        //            _trajectorySamples[nOptimizationSamples + i].targetHoldIds, nOptimizationSamples + i);
+            //List<float[]> trajetories_feature_states = new List<float[]>();
+            //// get a couple of init state - proposed actions from neural net to evalue them
+            //if (mNetworkManager.IsConnected && nNNEvalTrajectories > 0 && _ReplayExpreinces)
+            //{
+            //    for (int i = 0; i < nNNEvalTrajectories; i++)
+            //    {
+            //        float[] featureState = GetFeatureState(_trajectorySamples[nOptimizationSamples + i]._startingSlotIndex,
+            //            _trajectorySamples[nOptimizationSamples + i].targetHoldIds, nOptimizationSamples + i);
 
-        //        //        trajetories_feature_states.Add(featureState);
-        //        //    }
-        //        //    string snd_e_msg = MyTools.ParseIntoString('E', MyTools.ParseListArrFloatInToString(ref trajetories_feature_states));
-        //        //    string network_reply = mNetworkManager.Send(ref snd_e_msg);
+            //        trajetories_feature_states.Add(featureState);
+            //    }
+            //    string snd_e_msg = MyTools.ParseIntoString('E', MyTools.ParseListArrFloatInToString(ref trajetories_feature_states));
+            //    string network_reply = mNetworkManager.Send(ref snd_e_msg);
 
-        //        //    if (network_reply != "" && !network_reply.Contains("N/A"))
-        //        //    {
-        //        //        MyTools.ParseStringIntoListFloatArr(ref network_reply, ref nnEvalReply);
-        //        //    }
-        //        //    string reply_to_net = 'A'.ToString();
-        //        //    mNetworkManager.Send(ref reply_to_net);
+            //    if (network_reply != "" && !network_reply.Contains("N/A"))
+            //    {
+            //        MyTools.ParseStringIntoListFloatArr(ref network_reply, ref nnEvalReply);
+            //    }
+            //    string reply_to_net = 'A'.ToString();
+            //    mNetworkManager.Send(ref reply_to_net);
 
-        //        //    for (int i = 0; i < nNNEvalTrajectories; i++)
-        //        //    {
-        //        //        int cSampleNum = curNumTrajectories - nOptimizationSamples;
-        //        //        _trajectorySamples[curNumTrajectories].datum_index = -1;
+            //    for (int i = 0; i < nNNEvalTrajectories; i++)
+            //    {
+            //        int cSampleNum = curNumTrajectories - nOptimizationSamples;
+            //        _trajectorySamples[curNumTrajectories].datum_index = -1;
 
-        //        //        if (nnEvalReply[cSampleNum].Count == 1 + 334 + 32 + _trajectorySamples[curNumTrajectories].sample_action_size + 3)
-        //        //        {
-        //        //            nnEvalStartingState[cSampleNum].Clear();
-        //        //            nnEvalStartingHolds[cSampleNum].Clear();
-        //        //            nnEvalPredictedPolicy[cSampleNum].Clear();
+            //        if (nnEvalReply[cSampleNum].Count == 1 + 334 + 32 + _trajectorySamples[curNumTrajectories].sample_action_size + 3)
+            //        {
+            //            nnEvalStartingState[cSampleNum].Clear();
+            //            nnEvalStartingHolds[cSampleNum].Clear();
+            //            nnEvalPredictedPolicy[cSampleNum].Clear();
 
-        //        //            int cIndex = 0;
-        //        //            int datum_index = (int)nnEvalReply[cSampleNum][cIndex]; cIndex++;
-        //        //            _trajectorySamples[curNumTrajectories].datum_index = datum_index;
+            //            int cIndex = 0;
+            //            int datum_index = (int)nnEvalReply[cSampleNum][cIndex]; cIndex++;
+            //            _trajectorySamples[curNumTrajectories].datum_index = datum_index;
 
-        //        //            int cLength = (int)nnEvalReply[cSampleNum][cIndex]; cIndex++;
-        //        //            for (int s = 0; s < cLength; s++) // 334
-        //        //            {
-        //        //                nnEvalStartingState[cSampleNum].Add(nnEvalReply[cSampleNum][cIndex]); cIndex++;
-        //        //            }
+            //            int cLength = (int)nnEvalReply[cSampleNum][cIndex]; cIndex++;
+            //            for (int s = 0; s < cLength; s++) // 334
+            //            {
+            //                nnEvalStartingState[cSampleNum].Add(nnEvalReply[cSampleNum][cIndex]); cIndex++;
+            //            }
 
-        //        //            cLength = (int)nnEvalReply[cSampleNum][cIndex]; cIndex++;
-        //        //            for (int s = 0; s < cLength; s++) // 32
-        //        //            {
-        //        //                nnEvalStartingHolds[cSampleNum].Add(nnEvalReply[cSampleNum][cIndex]); cIndex++;
-        //        //            }
+            //            cLength = (int)nnEvalReply[cSampleNum][cIndex]; cIndex++;
+            //            for (int s = 0; s < cLength; s++) // 32
+            //            {
+            //                nnEvalStartingHolds[cSampleNum].Add(nnEvalReply[cSampleNum][cIndex]); cIndex++;
+            //            }
 
-        //        //            cLength = (int)nnEvalReply[cSampleNum][cIndex]; cIndex++;
-        //        //            for (int s = 0; s < cLength; s++) // 66
-        //        //            {
-        //        //                nnEvalPredictedPolicy[cSampleNum].Add(nnEvalReply[cSampleNum][cIndex]); cIndex++;
-        //        //            }
-        //        //            curNumTrajectories++;
+            //            cLength = (int)nnEvalReply[cSampleNum][cIndex]; cIndex++;
+            //            for (int s = 0; s < cLength; s++) // 66
+            //            {
+            //                nnEvalPredictedPolicy[cSampleNum].Add(nnEvalReply[cSampleNum][cIndex]); cIndex++;
+            //            }
+            //            curNumTrajectories++;
 
-        //        //        }
-        //        //        else if (nnEvalReply[cSampleNum].Count == 1 + 1 + _trajectorySamples[curNumTrajectories].sample_action_size)
-        //        //        {
-        //        //            nnEvalPredictedPolicy[cSampleNum].Clear();
+            //        }
+            //        else if (nnEvalReply[cSampleNum].Count == 1 + 1 + _trajectorySamples[curNumTrajectories].sample_action_size)
+            //        {
+            //            nnEvalPredictedPolicy[cSampleNum].Clear();
 
-        //        //            int cIndex = 0;
-        //        //            int datum_index = (int)nnEvalReply[cSampleNum][cIndex]; cIndex++;
-        //        //            _trajectorySamples[curNumTrajectories].datum_index = datum_index;
+            //            int cIndex = 0;
+            //            int datum_index = (int)nnEvalReply[cSampleNum][cIndex]; cIndex++;
+            //            _trajectorySamples[curNumTrajectories].datum_index = datum_index;
 
-        //        //            int cLength = (int)nnEvalReply[cSampleNum][cIndex]; cIndex++;
-        //        //            for (int s = 0; s < cLength; s++)
-        //        //            {
-        //        //                nnEvalPredictedPolicy[cSampleNum].Add(nnEvalReply[cSampleNum][cIndex]); cIndex++;
-        //        //            }
-        //        //            curNumTrajectories++;
-        //        //        }
-        //        //        else
-        //        //        {
-        //        //            nnEvalReply[cSampleNum].Clear();
-        //        //            if (_trajectorySamples[nOptimizationSamples + i]._startingSlotIndex >= 0)
-        //        //                _controlRigs[nOptimizationSamples + i].loadState(_trajectorySamples[nOptimizationSamples + i]._startingSlotIndex);
-        //        //        }
-        //        //    }
-        //        //}
-        //        ////else
-        //        ////{
-        //        ////    curNumTrajectories = ReadFromFile();
-        //        ////}
+            //            int cLength = (int)nnEvalReply[cSampleNum][cIndex]; cIndex++;
+            //            for (int s = 0; s < cLength; s++)
+            //            {
+            //                nnEvalPredictedPolicy[cSampleNum].Add(nnEvalReply[cSampleNum][cIndex]); cIndex++;
+            //            }
+            //            curNumTrajectories++;
+            //        }
+            //        else
+            //        {
+            //            nnEvalReply[cSampleNum].Clear();
+            //            if (_trajectorySamples[nOptimizationSamples + i]._startingSlotIndex >= 0)
+            //                _controlRigs[nOptimizationSamples + i].loadState(_trajectorySamples[nOptimizationSamples + i]._startingSlotIndex);
+            //        }
+            //    }
+            //}
+            ////else
+            ////{
+            ////    curNumTrajectories = ReadFromFile();
+            ////}
 
-        //        //if (_iter == 0 && nOptimizationSamples > 0 && !_ReplayExpreinces)
-        //        //{
-        //        //    //startingStateIdx = _samplePlan._sampledInitialStateSlotIdx;
-        //        //    float[] state_feature = GetFeatureState(startingStateIdx, _samplePlan._sampledTargetStanceID, 0);
+            //if (_iter == 0 && nOptimizationSamples > 0 && !_ReplayExpreinces)
+            //{
+            //    //startingStateIdx = _samplePlan._sampledInitialStateSlotIdx;
+            //    float[] state_feature = GetFeatureState(startingStateIdx, _samplePlan._sampledTargetStanceID, 0);
 
-        //        //    string network_data = "1|" + MyTools.ParseArrFloatInToString(state_feature);
-        //        //    string network_message = MyTools.ParseIntoString('Q', network_data);
+            //    string network_data = "1|" + MyTools.ParseArrFloatInToString(state_feature);
+            //    string network_message = MyTools.ParseIntoString('Q', network_data);
 
-        //        //    if (mNetworkManager.IsConnected)
-        //        //    {
-        //        //        int _sampleSize = nControlPoints * (1 + nAngle /*time + nAngle*/) + 4 /*time to let go of the hands and feet*/;
-        //        //        string network_reply = mNetworkManager.Send(ref network_message);
-        //        //        bool success_try = false;
-        //        //        if (network_reply != "" && network_reply != "N/A")
-        //        //        {
-        //        //            MyTools.ParseStringIntoFloatArr(network_reply, ref predicted_policy_mean_std);
-        //        //            success_try = true;
-        //        //            if (predicted_policy_mean_std.Count == _sampleSize || predicted_policy_mean_std.Count == 2 * _sampleSize)
-        //        //            {
-        //        //                success_try = false;
-        //        //            }
-        //        //        }
+            //    if (mNetworkManager.IsConnected)
+            //    {
+            //        int _sampleSize = nControlPoints * (1 + nAngle /*time + nAngle*/) + 4 /*time to let go of the hands and feet*/;
+            //        string network_reply = mNetworkManager.Send(ref network_message);
+            //        bool success_try = false;
+            //        if (network_reply != "" && network_reply != "N/A")
+            //        {
+            //            MyTools.ParseStringIntoFloatArr(network_reply, ref predicted_policy_mean_std);
+            //            success_try = true;
+            //            if (predicted_policy_mean_std.Count == _sampleSize || predicted_policy_mean_std.Count == 2 * _sampleSize)
+            //            {
+            //                success_try = false;
+            //            }
+            //        }
 
-        //        //        if (!success_try)
-        //        //        {
-        //        //            predicted_policy_mean_std.Clear();
-        //        //        }
-        //        //    }
-        //        //    else
-        //        //    {
-        //        //        predicted_policy_mean_std.Clear();
-        //        //    }
-        //        //    //init opt
-        //        //    InitOptimization();
-        //        //}
+            //        if (!success_try)
+            //        {
+            //            predicted_policy_mean_std.Clear();
+            //        }
+            //    }
+            //    else
+            //    {
+            //        predicted_policy_mean_std.Clear();
+            //    }
+            //    //init opt
+            //    InitOptimization();
+            //}
 
-        //        //return curNumTrajectories;
-        //    }
+            //return curNumTrajectories;
+        }
 
         // we create control points and re-start all trajectories
         void GenerateControlPoints(bool _isFirstItr)
@@ -1331,252 +1338,252 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
             return stateCost;
         }
 
-        //    public bool OptimizeCost(ref SamplingHighLevelPlan _samplePlan)
-        //    {
-        //        if (_PlayAnimation)
-        //        {
-        //            bool flag_start_over = true;
-        //            for (int t = 0; t < nOptimizationSamples + nNNEvalTrajectories; t++)
-        //            {
-        //                if (curShownState < _trajectorySamples[t]._cMemoryStepUsed
-        //                    && curShownState < _trajectorySamples[t]._fromToStates.Count
-        //                    && _trajectorySamples[t]._fromToStates[curShownState] >= 0)
-        //                {
-        //                    _controlRigs[t].loadState(_trajectorySamples[t]._fromToStates[curShownState]);
-        //                    flag_start_over = false;
-        //                }
-        //                else
-        //                {
-        //                    if (_trajectorySamples[t]._cSlotStateIdx >= 0)
-        //                        _controlRigs[t].loadState(_trajectorySamples[t]._cSlotStateIdx);
-        //                    else
-        //                        _controlRigs[t].loadState(reset_memory_idx);
-        //                }
-        //            }
-        //            curShownState += 3;
-        //            if (flag_start_over)
-        //                curShownState = 0;
-        //        }
-        //        else
-        //        {
-        //            int curNumTrajectories = InitTrajectories(ref _samplePlan);
-        //            // in each iteration we generate control points, in iter = 0 we generate them from uniform dist otherwise it is generated from cma-es
-        //            GenerateControlPoints(_iter == 0);
+        public bool OptimizeCost(ref SamplingHighLevelPlan _samplePlan)
+        {
+            if (_PlayAnimation)
+            {
+                bool flag_start_over = true;
+                for (int t = 0; t < nOptimizationSamples + nNNEvalTrajectories; t++)
+                {
+                    if (curShownState < _trajectorySamples[t]._cMemoryStepUsed
+                        && curShownState < _trajectorySamples[t]._fromToStates.Count
+                        && _trajectorySamples[t]._fromToStates[curShownState] >= 0)
+                    {
+                        _controlRigs[t].LoadState(_trajectorySamples[t]._fromToStates[curShownState]);
+                        flag_start_over = false;
+                    }
+                    else
+                    {
+                        if (_trajectorySamples[t]._cSlotStateIdx >= 0)
+                            _controlRigs[t].LoadState(_trajectorySamples[t]._cSlotStateIdx);
+                        else
+                            _controlRigs[t].LoadState(reset_memory_idx);
+                    }
+                }
+                curShownState += 3;
+                if (flag_start_over)
+                    curShownState = 0;
+            }
+            else
+            {
+                int curNumTrajectories = InitTrajectories(ref _samplePlan);
+                // in each iteration we generate control points, in iter = 0 we generate them from uniform dist otherwise it is generated from cma-es
+                GenerateControlPoints(_iter == 0);
 
-        //            // Update actions for nn evaluation
-        //            for (int _t = nOptimizationSamples; _t < curNumTrajectories; _t++)
-        //            {
-        //                ConvertToSampleAction(_t, false);
-        //            }
+                // Update actions for nn evaluation
+                for (int _t = nOptimizationSamples; _t < curNumTrajectories; _t++)
+                {
+                    ConvertToSampleAction(_t, false);
+                }
 
-        //            bool flag_opt_samples_done = ForwardSimulation(curNumTrajectories);
+                bool flag_opt_samples_done = ForwardSimulation(curNumTrajectories);
 
-        //            // update trajectory info
-        //            for (int t = nOptimizationSamples; t < curNumTrajectories; t++)
-        //            {
-        //                if (_trajectorySamples[t].isActionDone)
-        //                {
-        //                    if (_trajectorySamples[t]._cSimulationStep >= MaxStepsInOptSample
-        //                        || _trajectorySamples[t]._UseSpline
-        //                        || _trajectorySamples[t].isReached)
-        //                    {
-        //                        _trajectorySamples[t]._cMemoryStepUsed = _trajectorySamples[t]._cSimulationStep;
-        //                        _trajectorySamples[t]._cSimulationStep = 0;
-        //                        // send signal that trajectory is finished, restart for another trajectory
-        //                        _trajectorySamples[t].ResetFlag = true;
-        //                    }
-        //                }
-        //            }
+                // update trajectory info
+                for (int t = nOptimizationSamples; t < curNumTrajectories; t++)
+                {
+                    if (_trajectorySamples[t].isActionDone)
+                    {
+                        if (_trajectorySamples[t]._cSimulationStep >= MaxStepsInOptSample
+                            || _trajectorySamples[t]._UseSpline
+                            || _trajectorySamples[t].isReached)
+                        {
+                            _trajectorySamples[t]._cMemoryStepUsed = _trajectorySamples[t]._cSimulationStep;
+                            _trajectorySamples[t]._cSimulationStep = 0;
+                            // send signal that trajectory is finished, restart for another trajectory
+                            _trajectorySamples[t].ResetFlag = true;
+                        }
+                    }
+                }
 
-        //            if (nOptimizationSamples > 0 && flag_opt_samples_done && !_ReplayExpreinces)
-        //            {
-        //                // here one iter of opt is done
-        //                // reset opt samples
-        //                for (int t = 0; t < nOptimizationSamples; t++)
-        //                {
-        //                    _trajectorySamples[t]._cMemoryStepUsed = _trajectorySamples[t]._cSimulationStep;
-        //                    _trajectorySamples[t]._cSimulationStep = 0;
-        //                    _trajectorySamples[t].ResetFlag = true;
-        //                }
-        //                // update cma-es mean and variance
-        //                _opt.update(_samples);
+                if (nOptimizationSamples > 0 && flag_opt_samples_done && !_ReplayExpreinces)
+                {
+                    // here one iter of opt is done
+                    // reset opt samples
+                    for (int t = 0; t < nOptimizationSamples; t++)
+                    {
+                        _trajectorySamples[t]._cMemoryStepUsed = _trajectorySamples[t]._cSimulationStep;
+                        _trajectorySamples[t]._cSimulationStep = 0;
+                        _trajectorySamples[t].ResetFlag = true;
+                    }
+                    // update cma-es mean and variance
+                    _opt.update(_samples);
 
-        //                //bestPreSample.objectiveFuncVal = _trajectorySamples[0].objectiveFuncVal;
+                    //bestPreSample.objectiveFuncVal = _trajectorySamples[0].objectiveFuncVal;
 
-        //                int _bestTrajectoryIdx = -1;
-        //                double _opt_obj_value = float.MinValue;
-        //                if (nOptimizationSamples > 0)
-        //                {
-        //                    _bestTrajectoryIdx = _opt.getBestIndex();
-        //                    _opt_obj_value = _opt.getBestObjectiveFuncValue();
-        //                }
-        //                else if (curNumTrajectories > 0)
-        //                {
-        //                    /////////////////////////////////////// TODO: if we do not have any opt, search for best manually
-        //                    _bestTrajectoryIdx = 0;
-        //                }
-        //                // store best sample
-        //                if (_bestTrajectoryIdx > -1)
-        //                {
-        //                    int _sampleSize = nControlPoints * (1 + nAngle /*time + nAngle*/) + 4 /*time to let go of the hands and feet*/;
-        //                    if (_iter == 0 || _opt_obj_value > bestPreSample.objectiveFuncVal + _fixedThresholdCost)
-        //                    {
-        //                        if (_iter == 0)
-        //                        {
-        //                            neuralNetSampleVal = _trajectorySamples[0].objectiveFuncVal;
-        //                        }
+                    int _bestTrajectoryIdx = -1;
+                    double _opt_obj_value = float.MinValue;
+                    if (nOptimizationSamples > 0)
+                    {
+                        _bestTrajectoryIdx = _opt.getBestIndex();
+                        _opt_obj_value = _opt.getBestObjectiveFuncValue();
+                    }
+                    else if (curNumTrajectories > 0)
+                    {
+                        /////////////////////////////////////// TODO: if we do not have any opt, search for best manually
+                        _bestTrajectoryIdx = 0;
+                    }
+                    // store best sample
+                    if (_bestTrajectoryIdx > -1)
+                    {
+                        int _sampleSize = nControlPoints * (1 + nAngle /*time + nAngle*/) + 4 /*time to let go of the hands and feet*/;
+                        if (_iter == 0 || _opt_obj_value > bestPreSample.objectiveFuncVal + _fixedThresholdCost)
+                        {
+                            if (_iter == 0)
+                            {
+                                neuralNetSampleVal = _trajectorySamples[0].objectiveFuncVal;
+                            }
 
-        //                        if (nOptimizationSamples > 0)
-        //                        {
-        //                            BestSample.objectiveFuncVal = _opt.getBestObjectiveFuncValue();
-        //                            for (int c = 0; c < _sampleSize; c++)
-        //                                BestSample.x[c] = _opt.getBest()[c];
-        //                        }
+                            if (nOptimizationSamples > 0)
+                            {
+                                BestSample.objectiveFuncVal = _opt.getBestObjectiveFuncValue();
+                                for (int c = 0; c < _sampleSize; c++)
+                                    BestSample.x[c] = _opt.getBest()[c];
+                            }
 
-        //                        bestPreSample.objectiveFuncVal = _trajectorySamples[_bestTrajectoryIdx].objectiveFuncVal;
-        //                        bestPreSample.state_cost = _trajectorySamples[_bestTrajectoryIdx].state_cost;
-        //                        bestPreSample.control_cost = _trajectorySamples[_bestTrajectoryIdx].control_cost;
-        //                        bestPreSample._sampledMaxStep = _trajectorySamples[_bestTrajectoryIdx]._sampledMaxStep;
-        //                        for (int i = 0; i < _sampleSize; i++)
-        //                            bestPreSample._sampledAction[i] = _trajectorySamples[_bestTrajectoryIdx]._sampledAction[i];
+                            bestPreSample.objectiveFuncVal = _trajectorySamples[_bestTrajectoryIdx].objectiveFuncVal;
+                            bestPreSample.state_cost = _trajectorySamples[_bestTrajectoryIdx].state_cost;
+                            bestPreSample.control_cost = _trajectorySamples[_bestTrajectoryIdx].control_cost;
+                            bestPreSample._sampledMaxStep = _trajectorySamples[_bestTrajectoryIdx]._sampledMaxStep;
+                            for (int i = 0; i < _sampleSize; i++)
+                                bestPreSample._sampledAction[i] = _trajectorySamples[_bestTrajectoryIdx]._sampledAction[i];
 
-        //                        for (int i = 0; i < 4; i++)
-        //                        {
-        //                            bestPreSample.targetHoldIds[i] = _trajectorySamples[_bestTrajectoryIdx].targetHoldIds[i];
-        //                        }
+                            for (int i = 0; i < 4; i++)
+                            {
+                                bestPreSample.targetHoldIds[i] = _trajectorySamples[_bestTrajectoryIdx].targetHoldIds[i];
+                            }
 
-        //                        bestPreSample._sampledMaxStep = _trajectorySamples[_bestTrajectoryIdx]._sampledMaxStep;
+                            bestPreSample._sampledMaxStep = _trajectorySamples[_bestTrajectoryIdx]._sampledMaxStep;
 
-        //                        mMemory.SaveState(bestPreSample._cSlotStateIdx, _trajectorySamples[_bestTrajectoryIdx]._cSlotStateIdx);
-        //                        mMemory.SaveState(bestPreSample._startingSlotIndex, _trajectorySamples[_bestTrajectoryIdx]._startingSlotIndex);
-        //                        for (int _s = 0; _s < _trajectorySamples[_bestTrajectoryIdx]._sampledMaxStep; _s++)
-        //                        {
-        //                            mMemory.SaveState(bestPreSample._fromToStates[_s], _trajectorySamples[_bestTrajectoryIdx]._fromToStates[_s]);
-        //                        }
+                            mMemory.SaveState(bestPreSample._cSlotStateIdx, _trajectorySamples[_bestTrajectoryIdx]._cSlotStateIdx);
+                            mMemory.SaveState(bestPreSample._startingSlotIndex, _trajectorySamples[_bestTrajectoryIdx]._startingSlotIndex);
+                            for (int _s = 0; _s < _trajectorySamples[_bestTrajectoryIdx]._sampledMaxStep; _s++)
+                            {
+                                mMemory.SaveState(bestPreSample._fromToStates[_s], _trajectorySamples[_bestTrajectoryIdx]._fromToStates[_s]);
+                            }
 
-        //                        bestPreSample.isReached = _trajectorySamples[_bestTrajectoryIdx].isReached;
-        //                    }
-        //                }
+                            bestPreSample.isReached = _trajectorySamples[_bestTrajectoryIdx].isReached;
+                        }
+                    }
 
-        //                UnityEngine.Debug.Log("state cost:" + (_trajectorySamples[_bestTrajectoryIdx].state_cost).ToString("f3"));
+                    UnityEngine.Debug.Log("state cost:" + (_trajectorySamples[_bestTrajectoryIdx].state_cost).ToString("f3"));
 
-        //                _iter++;
-        //                if (_opt.getBestObjectiveFuncValue() - bestPreSample.objectiveFuncVal > _fixedThresholdCost)
-        //                {
-        //                    _fixedIter = 0;
-        //                }
-        //                else
-        //                {
-        //                    _fixedIter++;
-        //                }
-        //            }
+                    _iter++;
+                    if (_opt.getBestObjectiveFuncValue() - bestPreSample.objectiveFuncVal > _fixedThresholdCost)
+                    {
+                        _fixedIter = 0;
+                    }
+                    else
+                    {
+                        _fixedIter++;
+                    }
+                }
 
-        //            _controlRigs[GetMasterTrajectoryIdx()].loadState(bestPreSample._cSlotStateIdx);
+                _controlRigs[GetMasterTrajectoryIdx()].LoadState(bestPreSample._cSlotStateIdx);
 
-        //            //int reached_eval = 0;
-        //            if (mNetworkManager.IsConnected)
-        //            {
-        //                string snd_msg = (curNumTrajectories - nOptimizationSamples).ToString() + "|";
+                //int reached_eval = 0;
+                if (mNetworkManager.IsConnected)
+                {
+                    string snd_msg = (curNumTrajectories - nOptimizationSamples).ToString() + "|";
 
-        //                for (int t = nOptimizationSamples; t < curNumTrajectories; t++)
-        //                {
-        //                    //if (_trajectorySamples[t].isReached)
-        //                    //    AddToRandomInitStates(_trajectorySamples[t]._cSlotStateIdx);
+                    for (int t = nOptimizationSamples; t < curNumTrajectories; t++)
+                    {
+                        //if (_trajectorySamples[t].isReached)
+                        //    AddToRandomInitStates(_trajectorySamples[t]._cSlotStateIdx);
 
-        //                    int is_reached = _trajectorySamples[t].isReached ? 1 : 0;
-        //                    //Vector2 ret_dis_startingDis = GetDisCurEndPointToTarget(_trajectorySamples[t]._cSlotStateIdx, t);
-        //                    float reward = -(_trajectorySamples[t].state_cost + _trajectorySamples[t].control_cost);
-        //                    int is_trajectory_done = _trajectorySamples[t].ResetFlag ? 1 : 0;
-        //                    int is_addable = 1;
+                        int is_reached = _trajectorySamples[t].isReached ? 1 : 0;
+                        //Vector2 ret_dis_startingDis = GetDisCurEndPointToTarget(_trajectorySamples[t]._cSlotStateIdx, t);
+                        float reward = -(_trajectorySamples[t].state_cost + _trajectorySamples[t].control_cost);
+                        int is_trajectory_done = _trajectorySamples[t].ResetFlag ? 1 : 0;
+                        int is_addable = 1;
 
-        //                    snd_msg += is_trajectory_done.ToString()
-        //                        + "|" + is_addable.ToString()
-        //                        + "|" + reward.ToString()
-        //                        + "|" + is_reached.ToString();
-        //                    if (t != curNumTrajectories - 1)
-        //                    {
-        //                        snd_msg += "|";
-        //                    }
-        //                }
+                        snd_msg += is_trajectory_done.ToString()
+                            + "|" + is_addable.ToString()
+                            + "|" + reward.ToString()
+                            + "|" + is_reached.ToString();
+                        if (t != curNumTrajectories - 1)
+                        {
+                            snd_msg += "|";
+                        }
+                    }
 
-        //                string snd_v_msg = MyTools.ParseIntoString('V', snd_msg);
-        //                mNetworkManager.Send(ref snd_v_msg);
-        //            }
-        //            else
-        //            {
-        //                WriteToFile(curNumTrajectories);
-        //            }
+                    string snd_v_msg = MyTools.ParseIntoString('V', snd_msg);
+                    mNetworkManager.Send(ref snd_v_msg);
+                }
+                else
+                {
+                    WriteToFile(curNumTrajectories);
+                }
 
-        //            //int valid_num_trajectories = 0;
-        //            //for (int t = nOptimizationSamples; t < curNumTrajectories; t++)
-        //            //{
-        //            //    int[] target_holds = _trajectorySamples[t].targetHoldIds;
-        //            //    int[] cur_holds = _controlRigs[t].getCurrentHoldIds();
-        //            //    if (MyTools.GetDiffBtwSetASetB(target_holds, cur_holds) <= 1)
-        //            //    {
-        //            //        valid_num_trajectories++;
-        //            //    }
-        //            //    if (MyTools.IsStanceAEqualStanceB(target_holds, cur_holds))
-        //            //    {
-        //            //        reached_eval++;
-        //            //    }
-        //            //}
-        //            //if (valid_num_trajectories > 0)
-        //            //    Debug.Log("Eval:" + ((reached_eval + 0.0f) / (valid_num_trajectories + 0.001f)).ToString("f3") + ", state:"
-        //            //        + _trajectorySamples[_bestTrajectoryIdx].state_cost.ToString("f3") + ", control:" + _trajectorySamples[_bestTrajectoryIdx].control_cost.ToString("f3"));
+                //int valid_num_trajectories = 0;
+                //for (int t = nOptimizationSamples; t < curNumTrajectories; t++)
+                //{
+                //    int[] target_holds = _trajectorySamples[t].targetHoldIds;
+                //    int[] cur_holds = _controlRigs[t].getCurrentHoldIds();
+                //    if (MyTools.GetDiffBtwSetASetB(target_holds, cur_holds) <= 1)
+                //    {
+                //        valid_num_trajectories++;
+                //    }
+                //    if (MyTools.IsStanceAEqualStanceB(target_holds, cur_holds))
+                //    {
+                //        reached_eval++;
+                //    }
+                //}
+                //if (valid_num_trajectories > 0)
+                //    Debug.Log("Eval:" + ((reached_eval + 0.0f) / (valid_num_trajectories + 0.001f)).ToString("f3") + ", state:"
+                //        + _trajectorySamples[_bestTrajectoryIdx].state_cost.ToString("f3") + ", control:" + _trajectorySamples[_bestTrajectoryIdx].control_cost.ToString("f3"));
 
-        //        }
+            }
 
-        //        if ((_iter > _maxOptIter || _fixedIter > _maxFixedOptIter) && _iter > 0 && !_PlayAnimation)
-        //        {
-        //            //finalize opt
-        //            EndOptimization();
-        //            return true; // opt is done
-        //        }
+            if ((_iter > _maxOptIter || _fixedIter > _maxFixedOptIter) && _iter > 0 && !_PlayAnimation)
+            {
+                //finalize opt
+                EndOptimization();
+                return true; // opt is done
+            }
 
-        //        return false; // opt is not done
-        //    }
+            return false; // opt is not done
+        }
 
-        //    // trajectory_idx for loading holds ids and positions
-        //    Vector2 GetDisCurEndPointToTarget(int _CurSlotIdx, int trajectory_idx)
-        //    {
-        //        float _dis = 0.0f;
+        //// trajectory_idx for loading holds ids and positions
+        Vector2 GetDisCurEndPointToTarget(int _CurSlotIdx, int trajectory_idx)
+        {
+            float _dis = 0.0f;
 
-        //        int[] tholdIDs = _trajectorySamples[trajectory_idx].targetHoldIds;
+            int[] tholdIDs = _trajectorySamples[trajectory_idx].targetHoldIds;
 
-        //        int[] sholdIds = { -1, -1, -1, -1 };
-        //        List<Vector3> s_poses = new List<Vector3>();
-        //        mMemory.GetHoldIds(_trajectorySamples[trajectory_idx]._startingSlotIndex, ref sholdIds);
-        //        mMemory.GetEndPointPoses(_trajectorySamples[trajectory_idx]._startingSlotIndex, ref s_poses);
+            int[] sholdIds = { -1, -1, -1, -1 };
+            List<Vector3> s_poses = new List<Vector3>();
+            mMemory.GetHoldIds(_trajectorySamples[trajectory_idx]._startingSlotIndex, ref sholdIds);
+            mMemory.GetEndPointPoses(_trajectorySamples[trajectory_idx]._startingSlotIndex, ref s_poses);
 
-        //        int[] choldIds = { -1, -1, -1, -1 };
-        //        List<Vector3> e_poses = new List<Vector3>();
-        //        mMemory.GetHoldIds(_CurSlotIdx, ref choldIds);
-        //        mMemory.GetEndPointPoses(_CurSlotIdx, ref e_poses);
+            int[] choldIds = { -1, -1, -1, -1 };
+            List<Vector3> e_poses = new List<Vector3>();
+            mMemory.GetHoldIds(_CurSlotIdx, ref choldIds);
+            mMemory.GetEndPointPoses(_CurSlotIdx, ref e_poses);
 
 
-        //        int _diff = 0;
-        //        float starting_dis = 0.0f;
-        //        for (int i = 0; i < 4; i++)
-        //        {
-        //            if (tholdIDs[i] != choldIds[i] || tholdIDs[i] != sholdIds[i])
-        //            {
-        //                _diff++;
-        //                Vector3 tHPos = GetHoldPositionInContext(trajectory_idx, tholdIDs[i]);
-        //                if (tholdIDs[i] != choldIds[i])
-        //                {
-        //                    _dis += (e_poses[i] - tHPos).magnitude;
-        //                }
+            int _diff = 0;
+            float starting_dis = 0.0f;
+            for (int i = 0; i < 4; i++)
+            {
+                if (tholdIDs[i] != choldIds[i] || tholdIDs[i] != sholdIds[i])
+                {
+                    _diff++;
+                    Vector3 tHPos = _controlRigs[trajectory_idx].GetContextManager().GetHoldPosition(tholdIDs[i]);
+                    if (tholdIDs[i] != choldIds[i])
+                    {
+                        _dis += (e_poses[i] - tHPos).magnitude;
+                    }
 
-        //                if (tholdIDs[i] != sholdIds[i])
-        //                {
-        //                    starting_dis += (s_poses[i] - tHPos).magnitude;
-        //                }
-        //            }
-        //        }
+                    if (tholdIDs[i] != sholdIds[i])
+                    {
+                        starting_dis += (s_poses[i] - tHPos).magnitude;
+                    }
+                }
+            }
 
-        //        return new Vector2(_dis, starting_dis);
-        //    }
+            return new Vector2(_dis, starting_dis);
+        }
 
         //    void RandomizeHoldScence(int _targetContext, int random_initial_state_idx)
         //    {
@@ -1946,92 +1953,92 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
         //        return curNumTrajectories;
         //    }
 
-        //    void WriteToFile(int curNumTrajectories, bool write_all_steps = false)
-        //    {
-        //        if (!flag_writeToFile)
-        //            return;
+        void WriteToFile(int curNumTrajectories, bool write_all_steps = false)
+        {
+            if (!flag_writeToFile)
+                return;
 
-        //        for (int t = nOptimizationSamples; t < curNumTrajectories; t++)
-        //        {
-        //            int[] target_holds = _trajectorySamples[t].targetHoldIds;
-        //            int[] cur_holds = _controlRigs[t].getCurrentHoldIds();
-        //            bool success_transition = MyTools.IsStanceAEqualStanceB(target_holds, cur_holds);
+            for (int t = nOptimizationSamples; t < curNumTrajectories; t++)
+            {
+                int[] target_holds = _trajectorySamples[t].targetHoldIds;
+                int[] cur_holds = _controlRigs[t].GetCurrentHoldIds();
+                bool success_transition = MyTools.IsStanceAEqualStanceB(target_holds, cur_holds);
 
-        //            string cPath = "Learning\\Data\\Data" + current_written_file.ToString() + ".txt";
-        //            if (mFileWriter == null)
-        //            {
-        //                mFileWriter = new StreamWriter(cPath, true);
-        //            }
-        //            string write_eval = "";
-        //            int cIndex = 0;
+                string cPath = "Learning\\Data\\Data" + current_written_file.ToString() + ".txt";
+                if (mFileWriter == null)
+                {
+                    mFileWriter = new StreamWriter(cPath, true);
+                }
+                string write_eval = "";
+                int cIndex = 0;
 
-        //            // write exprience and success
-        //            int cur_itr_expreince = 0; cIndex++;// (int)nnEvalReply[t - nOptimizationSamples][cIndex]; cIndex++;
-        //            int cur_success_itr = 0; cIndex++;// (int)nnEvalReply[t - nOptimizationSamples][cIndex]; cIndex++;
-        //            if (success_transition)
-        //            {
-        //                cur_success_itr++;
-        //            }
-        //            write_eval = write_eval + (cur_itr_expreince + 1).ToString() + ",";
-        //            write_eval = write_eval + cur_success_itr.ToString() + ",";
+                // write exprience and success
+                int cur_itr_expreince = 0; cIndex++;// (int)nnEvalReply[t - nOptimizationSamples][cIndex]; cIndex++;
+                int cur_success_itr = 0; cIndex++;// (int)nnEvalReply[t - nOptimizationSamples][cIndex]; cIndex++;
+                if (success_transition)
+                {
+                    cur_success_itr++;
+                }
+                write_eval = write_eval + (cur_itr_expreince + 1).ToString() + ",";
+                write_eval = write_eval + cur_success_itr.ToString() + ",";
 
-        //            int state_length = (int)nnEvalReply[t - nOptimizationSamples][cIndex]; cIndex++;
-        //            write_eval = write_eval + state_length.ToString() + ",";
-        //            for (int i = 0; i < state_length; i++)
-        //            {
-        //                write_eval = write_eval + nnEvalReply[t - nOptimizationSamples][cIndex].ToString() + ","; cIndex++;
-        //            }
+                int state_length = (int)nnEvalReply[t - nOptimizationSamples][cIndex]; cIndex++;
+                write_eval = write_eval + state_length.ToString() + ",";
+                for (int i = 0; i < state_length; i++)
+                {
+                    write_eval = write_eval + nnEvalReply[t - nOptimizationSamples][cIndex].ToString() + ","; cIndex++;
+                }
 
-        //            int holds_length = (int)nnEvalReply[t - nOptimizationSamples][cIndex]; cIndex++;
-        //            write_eval = write_eval + holds_length.ToString() + ",";
-        //            for (int i = 0; i < holds_length; i++)
-        //            {
-        //                write_eval = write_eval + nnEvalReply[t - nOptimizationSamples][cIndex].ToString() + ","; cIndex++;
-        //            }
+                int holds_length = (int)nnEvalReply[t - nOptimizationSamples][cIndex]; cIndex++;
+                write_eval = write_eval + holds_length.ToString() + ",";
+                for (int i = 0; i < holds_length; i++)
+                {
+                    write_eval = write_eval + nnEvalReply[t - nOptimizationSamples][cIndex].ToString() + ","; cIndex++;
+                }
 
-        //            int _sampleSize = nControlPoints * (1 + nAngle /*time + nAngle*/) + 4 /*time to let go of the hands and feet*/;
-        //            int action_length = (int)_sampleSize; cIndex++;
-        //            write_eval = write_eval + (action_length).ToString() + ",";
-        //            for (int i = 0; i < action_length; i++)
-        //            {
-        //                write_eval = write_eval + nnEvalReply[t - nOptimizationSamples][cIndex].ToString() + ","; cIndex++;
-        //            }
+                int _sampleSize = nControlPoints * (1 + nAngle /*time + nAngle*/) + 4 /*time to let go of the hands and feet*/;
+                int action_length = (int)_sampleSize; cIndex++;
+                write_eval = write_eval + (action_length).ToString() + ",";
+                for (int i = 0; i < action_length; i++)
+                {
+                    write_eval = write_eval + nnEvalReply[t - nOptimizationSamples][cIndex].ToString() + ","; cIndex++;
+                }
 
-        //            Vector2 cValue = GetDisCurEndPointToTarget(_trajectorySamples[t]._cSlotStateIdx, t);//_trajectorySamples[t].objectiveFuncVal;// + nnEvalReply[t - nOptimizationSamples][cIndex];
-        //            write_eval = write_eval + (cValue[0]).ToString() + ",";
+                Vector2 cValue = GetDisCurEndPointToTarget(_trajectorySamples[t]._cSlotStateIdx, t);//_trajectorySamples[t].objectiveFuncVal;// + nnEvalReply[t - nOptimizationSamples][cIndex];
+                write_eval = write_eval + (cValue[0]).ToString() + ",";
 
-        //            float[] featureState = GetFeatureState(_trajectorySamples[t]._startingSlotIndex, target_holds, t);
-        //            for (int i = 0; i < featureState.Length; i++)
-        //            {
-        //                write_eval = write_eval + featureState[i].ToString() + ",";
-        //            }
+                float[] featureState = GetFeatureState(_trajectorySamples[t]._startingSlotIndex, target_holds, t);
+                for (int i = 0; i < featureState.Length; i++)
+                {
+                    write_eval = write_eval + featureState[i].ToString() + ",";
+                }
 
-        //            float[] nfeatureState = GetFeatureState(_trajectorySamples[t]._cSlotStateIdx, target_holds, t);
-        //            for (int i = 0; i < featureState.Length; i++)
-        //            {
-        //                if (i == featureState.Length - 1)
-        //                {
-        //                    write_eval = write_eval + featureState[i].ToString();
-        //                }
-        //                else
-        //                {
-        //                    write_eval = write_eval + featureState[i].ToString() + ",";
-        //                }
-        //            }
+                float[] nfeatureState = GetFeatureState(_trajectorySamples[t]._cSlotStateIdx, target_holds, t);
+                for (int i = 0; i < featureState.Length; i++)
+                {
+                    if (i == featureState.Length - 1)
+                    {
+                        write_eval = write_eval + featureState[i].ToString();
+                    }
+                    else
+                    {
+                        write_eval = write_eval + featureState[i].ToString() + ",";
+                    }
+                }
 
-        //            mFileWriter.WriteLine(write_eval);
-        //            current_written_data_index++;
-        //            if (current_written_data_index > 100)
-        //            {
-        //                current_written_data_index = 0;
-        //                current_written_file++;
+                mFileWriter.WriteLine(write_eval);
+                current_written_data_index++;
+                if (current_written_data_index > 100)
+                {
+                    current_written_data_index = 0;
+                    current_written_file++;
 
-        //                mFileWriter.Flush();
-        //                mFileWriter.Close();
-        //                mFileWriter = null;
-        //            }
-        //        }
-        //    }
+                    mFileWriter.Flush();
+                    mFileWriter.Close();
+                    mFileWriter = null;
+                }
+            }
+        }
 
         //    public void FinilizeLowLevelController()
         //    {
@@ -2364,11 +2371,18 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
             return _iter;
         }
 
-        public void SetPositionForHold(int holdId, Vector3 pos)
+        public void CopyMasterContextToOtherContexts()
         {
+            ContextManager master_context = _controlRigs[GetMasterTrajectoryIdx()].GetContextManager();
             for (int i = 0; i < nOptimizationSamples; i++)
-                _controlRigs[i].SetHoldPositionInContext(holdId, pos);
-            //SetPositionInContextForHold(masterContextIdx, holdId, pos);
+            {
+                for (int h = 0; h < master_context.NumHolds(); h++)
+                {
+                    _controlRigs[i].GetContextManager().SetHoldPosition(h, master_context.GetHoldPosition(h));
+                    _controlRigs[i].GetContextManager().SetHoldRotation(h, master_context.GetHoldRotation(h));
+                }
+                _controlRigs[i].GetContextManager().targetHoldType = master_context.targetHoldType;
+            }
         }
 
         //    public Vector3 GetCOMTrajectory(int trajectoryIdx)
@@ -2412,7 +2426,7 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
             }
             for (int i = 0; i < 4; i++)
             {
-                MyTools.PushStateFeature(ref outState, _controlRigs[contextIdx].GetHoldPositionInContext(cHoldIds[i]));
+                MyTools.PushStateFeature(ref outState, _controlRigs[contextIdx].GetContextManager().GetHoldPosition(cHoldIds[i]));
             }
 
             int count_diff = 0;
@@ -2425,7 +2439,7 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
 
             for (int i = 0; i < 4; i++)
             {
-                MyTools.PushStateFeature(ref outState, _controlRigs[contextIdx].GetHoldPositionInContext(tHoldIDs[i]));
+                MyTools.PushStateFeature(ref outState, _controlRigs[contextIdx].GetContextManager().GetHoldPosition(tHoldIDs[i]));
             }
             outState[cIndex - 1] = outState.Count - cIndex;
 
@@ -2439,7 +2453,7 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
             outState.Add(0);
             Vector3[] tHoldPoses = { new Vector3(), new Vector3(), new Vector3(), new Vector3() };
             for (int i = 0; i < 4; i++)
-                tHoldPoses[i] = _controlRigs[contextIdx].GetHoldPositionInContext(tHoldIDs[i]);
+                tHoldPoses[i] = _controlRigs[contextIdx].GetContextManager().GetHoldPosition(tHoldIDs[i]);
 
             int[] boneIndices = { 1, 2, 3, 4, 6, 7, 9, 10, 12, 13 };
 

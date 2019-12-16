@@ -711,7 +711,7 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
 
         LowLevelController mController;
         // the context belongs to the master context
-        ContextManager mContext;
+        ContextManager mMasterContext;
         SharedMemoryManager mMemory;
         StanceGraph mGraph;
         float sTime = float.MinValue;
@@ -727,8 +727,8 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
             mMemory = iMemory;
 
             masterContext = mController.GetMasterTrajectoryIdx();
-            mContext = mController.GetMasterContext();
-            mGraph = new StanceGraph(mContext);
+            mMasterContext = mController.GetMasterContext();
+            mGraph = new StanceGraph(mMasterContext);
 
         }
 
@@ -880,14 +880,10 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
 
             //     mController.currentSD = Random.Range(0.1f, 0.5f);
 
-            mContext.RandomizeHoldPositions(Random.Range(50.0f, 130.0f));
+            mMasterContext.RandomizeHoldPositions();
             for (int i = 0; i < nearHandHoldIndex.Length; i++)
-                nearHandHoldIndex[i] = mContext.retNearHandIndex[i];
-
-            for (int h = 0; h < mContext.NumHolds(); h++)
-            {
-                mController.SetPositionForHold(h, mContext.GetHoldPosition(h));
-            }
+                nearHandHoldIndex[i] = mMasterContext.retNearHandIndex[i];
+            mController.CopyMasterContextToOtherContexts();// SetPositionForHold(h, mContext.GetHoldPosition(h));
 
             if (startingHighlevelStates == -1)
             {
@@ -1131,7 +1127,7 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
                 //    connectedHand = currentHolds[2];
                 //}
                 // get a couple of stance samples and choose the best one!
-                int[] _sample = mContext.GetRandomStanceAroundHandHold(Random.Range(0, mContext.NumHolds()), currentHolds, 1);
+                int[] _sample = mMasterContext.GetRandomStanceAroundHandHold(Random.Range(0, mMasterContext.NumHolds()), currentHolds, 1);
 
 
                 for (int i = 0; i < 4; i++)

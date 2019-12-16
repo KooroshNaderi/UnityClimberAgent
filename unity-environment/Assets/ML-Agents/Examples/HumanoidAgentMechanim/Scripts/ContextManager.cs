@@ -2,6 +2,7 @@
 using UnityEngine;
 using Assets.ML_Agents.Examples.SharedAssets.Scripts;
 using Assets.ML_Agents.Examples.ClimberScripts;
+using UnityEditor;
 
 public class ContextManager : MonoBehaviour
 {
@@ -18,23 +19,31 @@ public class ContextManager : MonoBehaviour
     int goal_hold_id = -1;
     List<List<int>> indices_around_hand = new List<List<int>>();
     List<List<int>> possible_hold_index_diff = null;
+    HoldInfo.HoldType currentHoldType = HoldInfo.HoldType.Sphere;
 
     public GameObject agentGameObject;
+
+    public HoldInfo.HoldType targetHoldType = HoldInfo.HoldType.Sphere;
+
     public int[] retNearHandIndex = { -1, -1 };
+
+    public bool FlagCanRandomizeFromInterface = true;
     public bool RandomizeHolds = true;
+    
     // Start is called before the first frame update
     void Start()
     {
-        for (int _c = 0; _c < this.transform.childCount; _c++)
+        for (int i = 0; i < agentGameObject.transform.childCount; i++)
         {
-            Transform child_transform = this.transform.GetChild(_c);
+            Transform child_transform = agentGameObject.transform.GetChild(i);
             if (child_transform.name.Contains("Hold"))
             {
-                Vector3 pos = child_transform.position - this.transform.position;
+                Vector3 pos = child_transform.localPosition;
 
                 child_transform.GetComponent<HoldInfo>().holdId = _holdsTrasforms.Count;
+
                 _holdsTrasforms.Add(child_transform);
-                //_holdsPositions.Add(pos);
+
                 wallZPos = pos.z;
             }
         }
@@ -55,21 +64,48 @@ public class ContextManager : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (RandomizeHolds)
+        if (RandomizeHolds && FlagCanRandomizeFromInterface)
         {
-            RandomizeHoldPositions(Random.Range(50.0f, 130.0f));
+            RandomizeHoldPositions();
             RandomizeHolds = false;
+        }
+
+        if (currentHoldType != targetHoldType)
+        {
+            for (int h = 0; h < _holdsTrasforms.Count; h++)
+                _holdsTrasforms[h].GetComponent<HoldInfo>().targetHoldType = targetHoldType;
+            currentHoldType = targetHoldType;
         }
     }
 
-    public List<Transform> GetHoldTransformList()
+    public void DeactiveRandomizeFromInterface()
     {
-        return _holdsTrasforms;
+        FlagCanRandomizeFromInterface = false;
+    }
+
+    public void SetColorToHolds(int hold_id, Color _color)
+    {
+        _color.a = 0.25f;
+        if (hold_id > -1)
+            _holdsTrasforms[hold_id].gameObject.GetComponentInChildren<Renderer>().material.color = _color;
+        return;
+    }
+
+    public int GetNumHolds()
+    {
+        return _holdsTrasforms.Count;
     }
 
     public static float HoldSize
     {
         get { return holdSize; }
+    }
+
+    public Vector3 GetHoldGlobalPosition(int h)
+    {
+        if (h < 0 || h >= NumHolds())
+            return new Vector3(0, 0, 0);
+        return _holdsTrasforms[h].position;
     }
 
     public Vector3 GetHoldPosition(int h)
@@ -99,13 +135,44 @@ public class ContextManager : MonoBehaviour
         }
     }
 
+    public Quaternion GetHoldRotation(int h)
+    {
+        if (h < 0 || h >= NumHolds())
+            return new Quaternion(0, 0, 0, 1.0f);
+        return _holdsTrasforms[h].localRotation;
+    }
+
+    public void SetHoldRotation(int h, Quaternion _rotation)
+    {
+        if (h < NumHolds() && h >= 0)
+        {
+            _holdsTrasforms[h].localRotation = _rotation;
+        }
+    }
+
+    public HoldInfo.HoldType GetHoldType(int h)
+    {
+        if (h < 0 || h >= NumHolds())
+            return HoldInfo.HoldType.Sphere;
+        return _holdsTrasforms[h].GetComponent<HoldInfo>().targetHoldType;
+    }
+
+    public void SetHoldType(int h, HoldInfo.HoldType _type)
+    {
+        if (h < NumHolds() && h >= 0)
+        {
+            _holdsTrasforms[h].GetComponent<HoldInfo>().targetHoldType = _type;
+        }
+    }
+
     public int NumHolds()
     {
         return _holdsTrasforms.Count;
     }
 
-    public void RandomizeHoldPositions(float _angle)
+    public void RandomizeHoldPositions()
     {
+        float _angle = UnityEngine.Random.Range(50.0f, 130.0f);
         _angle = _angle * Mathf.Deg2Rad;
 
         // there is alwayse the same amount of holds but with randomized hold positions
@@ -135,8 +202,8 @@ public class ContextManager : MonoBehaviour
             float col = _dir.x * index_on_line;
             for (int i = 0; i < 2; i++)
             {
-                float r1 = Random.Range(0.0f, 1.0f);
-                float r2 = Random.Range(0.0f, 1.0f);
+                float r1 = UnityEngine.Random.Range(0.0f, 1.0f);
+                float r2 = UnityEngine.Random.Range(0.0f, 1.0f);
 
                 float nZ = cHeightZ + row * (climberRadius / 2.0f) + (climberRadius / 5.0f) * r2;
                 float nX = startPosX + col * (climberHandHandDis / 2.0f) - (climberHandHandDis / 2.1f) + (2.0f * r1 * (climberHandHandDis / 2.1f));
@@ -238,7 +305,7 @@ public class ContextManager : MonoBehaviour
                 int i = indices[m];
                 List<int> possible_hold_diff_i = possible_hold_index_diff[i];
 
-                int itr_index_diff_i = Random.Range(0, possible_hold_index_diff[i].Count);
+                int itr_index_diff_i = UnityEngine.Random.Range(0, possible_hold_index_diff[i].Count);
                 if (itr_index_diff_i >= possible_hold_index_diff[i].Count - 1)
                     itr_index_diff_i = possible_hold_index_diff[i].Count - 1;
                 out_sample[i] = possible_hold_diff_i[itr_index_diff_i];
@@ -330,7 +397,7 @@ public class ContextManager : MonoBehaviour
                 int i = indices[m];
                 List<int> possible_hold_diff_i = possible_hold_index_diff[i];
 
-                int itr_index_diff_i = Random.Range(0, possible_hold_index_diff[i].Count);
+                int itr_index_diff_i = UnityEngine.Random.Range(0, possible_hold_index_diff[i].Count);
                 if (itr_index_diff_i >= possible_hold_index_diff[i].Count - 1)
                     itr_index_diff_i = possible_hold_index_diff[i].Count - 1;
                 out_sample[i] = possible_hold_diff_i[itr_index_diff_i];
@@ -526,4 +593,25 @@ public class ContextManager : MonoBehaviour
         return true;
     }
    
+}
+
+[CustomEditor(typeof(ContextManager))]
+public class MyScriptEditor : Editor
+{
+    public override void OnInspectorGUI()
+    {
+        var myScript = target as ContextManager;
+
+        myScript.agentGameObject = EditorGUILayout.ObjectField("Agent Game Object", myScript.agentGameObject, typeof(GameObject), true) as GameObject;
+
+        myScript.targetHoldType = (HoldInfo.HoldType)EditorGUILayout.EnumPopup("Primitive Holds:", myScript.targetHoldType);
+
+        //myScript.retNearHandIndex = { -1, -1 };
+        
+        //myScript.FlagCanRandomizeFromInterface = GUILayout.Toggle(myScript.FlagCanRandomizeFromInterface, "EnableRandomize");
+
+        if (myScript.FlagCanRandomizeFromInterface)
+            myScript.RandomizeHolds = EditorGUILayout.Toggle("FlagRandomize", myScript.RandomizeHolds);
+
+    }
 }

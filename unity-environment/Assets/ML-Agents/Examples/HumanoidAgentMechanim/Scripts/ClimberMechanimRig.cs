@@ -19,8 +19,12 @@ public class ClimberMechanimRig : HumanoidMecanimRig
         }
 
         public int HumanoidBodyStateID { get; set; } = -1;
+
         public int[] hold_bodies_ids = { -1, -1, -1, -1 };
         public Vector3[] current_hold_pos = new Vector3[4];
+        public Quaternion[] current_hold_rot = new Quaternion[4];
+        public HoldInfo.HoldType[] current_hold_type = new HoldInfo.HoldType[4];
+
         public Vector3[] end_bodies_pos = new Vector3[4];
         public Vector3 hipLocation = new Vector3();
 
@@ -73,6 +77,11 @@ public class ClimberMechanimRig : HumanoidMecanimRig
         
         // initilize spline action settings
         spline = new RecursiveTCBSpline[this.numControlDOFs()];
+        for (int i = 0; i < this.numControlDOFs(); i++)
+        {
+            spline[i] = new RecursiveTCBSpline();
+            spline[i].setState(0.0f, 0.0f);
+        }
 
         for (int i = 0; i < 4; i++)
         {
@@ -119,6 +128,9 @@ public class ClimberMechanimRig : HumanoidMecanimRig
             {
                 mClimberMemory.savedStates[_freeSlotIdx].hold_bodies_ids[h] = connectBodyParts[h].current_hold_id;
                 mClimberMemory.savedStates[_freeSlotIdx].current_hold_pos[h] = mContextInfo.GetHoldPosition(connectBodyParts[h].current_hold_id);
+                mClimberMemory.savedStates[_freeSlotIdx].current_hold_rot[h] = mContextInfo.GetHoldRotation(connectBodyParts[h].current_hold_id);
+                mClimberMemory.savedStates[_freeSlotIdx].current_hold_type[h] = mContextInfo.GetHoldType(connectBodyParts[h].current_hold_id);
+
                 mClimberMemory.savedStates[_freeSlotIdx].end_bodies_pos[h] = connectBodyParts[h]._bodyPartInfo.localPosition;
             }
             // save hip position
@@ -153,6 +165,63 @@ public class ClimberMechanimRig : HumanoidMecanimRig
     // this function loads the given state id to the current climber's rig
     public override bool LoadState(int _state_id)
     {
+        if (mClimberMemory == null)
+            return false;
+        if (mClimberMemory.savedStates == null)
+            return false;
+
+        if (_state_id >= 0 && _state_id < mClimberMemory.savedStates.Count)
+        {
+            // disconnect hands and feet
+            for (int b = 0; b < 4; b++)
+                connectBodyParts[b].disconnectBodyPart();
+
+            // load all body state
+            if (mClimberMemory.savedStates[_state_id].HumanoidBodyStateID >= 0)
+            {
+                base.LoadState(mClimberMemory.savedStates[_state_id].HumanoidBodyStateID);
+            }
+            
+            // now load current stance info
+            for (int h = 0; h < 4; h++)
+            {
+                int c_hold_id = mClimberMemory.savedStates[_state_id].hold_bodies_ids[h];
+                if (c_hold_id >= 0)
+                {
+                    mContextInfo.SetHoldPosition(c_hold_id, mClimberMemory.savedStates[_state_id].current_hold_pos[h]);
+                    mContextInfo.SetHoldRotation(c_hold_id, mClimberMemory.savedStates[_state_id].current_hold_rot[h]);
+                    mContextInfo.SetHoldType(c_hold_id, mClimberMemory.savedStates[_state_id].current_hold_type[h]);
+                }
+                connectBodyParts[h]._bodyPartInfo.localPosition = mClimberMemory.savedStates[_state_id].end_bodies_pos[h];
+            }
+            
+            // load connector info
+            for (int b = 0; b < 4; b++)
+            {
+                connectBodyParts[b].GetRigidBody().transform.localPosition = mClimberMemory.savedStates[_state_id].connectorPos[b];
+                connectBodyParts[b].GetRigidBody().transform.localRotation = mClimberMemory.savedStates[_state_id].connectorRot[b];
+                connectBodyParts[b].GetRigidBody().velocity = mClimberMemory.savedStates[_state_id].connectorVel[b];
+                connectBodyParts[b].GetRigidBody().angularVelocity = mClimberMemory.savedStates[_state_id].connectorAVel[b];
+            }
+
+            // save spline values
+            for (int i = 0; i < mClimberMemory.savedStates[_state_id].spline_init_values.Length; i++)
+            {
+                spline[i].setState(mClimberMemory.savedStates[_state_id].spline_init_values[i][0], 
+                    mClimberMemory.savedStates[_state_id].spline_init_values[i][1]);
+            }
+
+            // connect hands and feet given current hold-ids
+            for (int b = 0; b < 4; b++)
+            {
+                int c_hold_id = mClimberMemory.savedStates[_state_id].hold_bodies_ids[b];
+                if (c_hold_id > 0)
+                    connectBodyParts[b].connectBodyPart(c_hold_id);
+            }
+
+            return true; // successful saving
+        }
+
         return false;
     }
 
@@ -175,7 +244,7 @@ public class ClimberMechanimRig : HumanoidMecanimRig
         {
             if (targetHoldIds[i] != -1)
             {
-                Vector3 hold_pos_i = GetHoldPositionInContext(targetHoldIds[i]);
+                Vector3 hold_pos_i = mContextInfo.GetHoldPosition(targetHoldIds[i]);
                 Vector3 contact_pos_i = GetEndBonePosition(i);
                 float dis_i = (hold_pos_i - contact_pos_i).magnitude;
 
@@ -212,9 +281,14 @@ public class ClimberMechanimRig : HumanoidMecanimRig
         return;
     }
 
-    public List<EndBodyPart> GetEndBodyParts()
+    public void SetColorToLimb(int limb_id, Color _color)
     {
-        return connectBodyParts;
+        connectBodyParts[limb_id]._bodyPartInfo.gameObject.GetComponent<Renderer>().material.color = _color;
+    }
+
+    public Vector3 GetEndBoneGlobalPosition(int limb_id)
+    {
+        return connectBodyParts[limb_id]._bodyPartInfo.position;
     }
 
     // return the global position of end limb poses with respect to the agent's environment
@@ -233,15 +307,15 @@ public class ClimberMechanimRig : HumanoidMecanimRig
         return this.readAnglePos();
     }
 
-    public void SetHoldPositionInContext(int holdId, Vector3 pos)
+    public ContextManager GetRigsContext()
     {
-        mContextInfo.SetHoldPosition(holdId, pos);
+        return mContextInfo;
     }
 
-    public Vector3 GetHoldPositionInContext(int holdId)
-    {
-        return mContextInfo.GetHoldPosition(holdId);
-    }
+    //public Vector3 GetHoldPositionInContext(int holdId)
+    //{
+    //    return mContextInfo.GetHoldPosition(holdId);
+    //}
 
     public ContextManager GetContextManager()
     {

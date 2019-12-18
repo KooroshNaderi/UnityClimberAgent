@@ -464,6 +464,11 @@ public class HumanoidMecanimRig : MonoBehaviour
                 vel[i] = _c.vel[i];
                 aVel[i] = _c.aVel[i];
             }
+
+            for (int i = 0; i < _c.currentSetAngles.Length; i++)
+            {
+                currentSetAngles[i] = _c.currentSetAngles[i];
+            }
             return;
         }
 
@@ -514,10 +519,10 @@ public class HumanoidMecanimRig : MonoBehaviour
 
     private class MemoryManager
     {
-        public List<HumanoidBodyState> savedStates = new List<HumanoidBodyState>();
+        public List<ClimberMechanimRig.HumanoidBodyState> savedStates = new List<ClimberMechanimRig.HumanoidBodyState>();
         public int GetNextFreeSlot()
         {
-            savedStates.Add(new HumanoidBodyState());
+            savedStates.Add(new ClimberMechanimRig.HumanoidBodyState());
             return savedStates.Count - 1;
         }
     };
@@ -567,6 +572,7 @@ public class HumanoidMecanimRig : MonoBehaviour
     [HideInInspector] public Vector3 initialBiasPosition = new Vector3();
     [HideInInspector] public float[] minAngle, maxAngle;
     private MemoryManager mMemory = new MemoryManager();
+
     private float[] cTargetAngles;
 
     void Start()
@@ -900,11 +906,6 @@ public class HumanoidMecanimRig : MonoBehaviour
         return effort;
     }
 
-    public int getNextFreeSavingSlot()
-    {
-        return mMemory.GetNextFreeSlot();
-    }
-
     // given a memory index it loads the info from memory to context
     public virtual bool LoadState(int _slotIndex)
     {
@@ -914,7 +915,7 @@ public class HumanoidMecanimRig : MonoBehaviour
             return false;
         if (_slotIndex >= 0 && _slotIndex < mMemory.savedStates.Count)
         {
-            loadState(mMemory.savedStates[_slotIndex]);
+            _LoadState(mMemory.savedStates[_slotIndex]);
 
             return true;
         }
@@ -931,27 +932,34 @@ public class HumanoidMecanimRig : MonoBehaviour
 
         if (_freeSlotIdx >= 0 && _freeSlotIdx < mMemory.savedStates.Count)
         {
-            mMemory.savedStates[_freeSlotIdx].SaveBoneState(bones);
+            _SaveState(mMemory.savedStates[_freeSlotIdx]);
 
-            for (int i = 0; i < numFreedoms; i++)
-            {
-                mMemory.savedStates[_freeSlotIdx].currentSetAngles[i] = cTargetAngles[i];
-            }
-            
-            return true; // successful saving
+            return true;
         }
 
         return false;
     }
 
     // given an initilized state it loads that state into context
-    private bool loadState(HumanoidBodyState nState)
+    protected bool _LoadState(HumanoidBodyState nState)
     {
         nState.LoadBoneState(ref bones);
 
         driveToPose(nState.currentSetAngles);
 
         return true;
+    }
+
+    protected bool _SaveState(HumanoidBodyState nState)
+    {
+        nState.SaveBoneState(bones);
+
+        for (int i = 0; i < numFreedoms; i++)
+        {
+            nState.currentSetAngles[i] = cTargetAngles[i];
+        }
+
+        return true; // successful saving
     }
 
     public int getNumBones()

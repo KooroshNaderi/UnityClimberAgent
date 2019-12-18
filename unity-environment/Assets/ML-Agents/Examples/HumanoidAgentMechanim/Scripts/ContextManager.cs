@@ -6,7 +6,6 @@ using UnityEditor;
 
 public class ContextManager : MonoBehaviour
 {
-    private const float holdSize = 0.25f;
     //List<Vector3> _holdsPositions = new List<Vector3>();// not-biased positions
     List<Transform> _holdsTrasforms = new List<Transform>();// not-biased positions
     float wallZPos;
@@ -96,10 +95,7 @@ public class ContextManager : MonoBehaviour
         return _holdsTrasforms.Count;
     }
 
-    public static float HoldSize
-    {
-        get { return holdSize; }
-    }
+    public float ConnectionThreshold { get; set; } = 0.2f;
 
     public Vector3 GetHoldGlobalPosition(int h)
     {
@@ -607,7 +603,7 @@ public class MyScriptEditor : Editor
         myScript.targetHoldType = (HoldInfo.HoldType)EditorGUILayout.EnumPopup("Primitive Holds:", myScript.targetHoldType);
 
         //myScript.retNearHandIndex = { -1, -1 };
-        
+
         //myScript.FlagCanRandomizeFromInterface = GUILayout.Toggle(myScript.FlagCanRandomizeFromInterface, "EnableRandomize");
 
         if (myScript.FlagCanRandomizeFromInterface)

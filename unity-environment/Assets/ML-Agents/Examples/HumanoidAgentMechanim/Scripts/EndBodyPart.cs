@@ -49,6 +49,11 @@ public class EndBodyPart : MonoBehaviour
 
     public void connectBodyPart(int targetHoldID)//float dis
     {
+        if (_locker_body == null)
+        {
+            _locker_body = _bodyPartInfo.GetComponent<Rigidbody>();
+        }
+
         if (current_hold_id != targetHoldID)
         {
             _locker_body.isKinematic = true;
@@ -76,6 +81,10 @@ public class EndBodyPart : MonoBehaviour
 
     public void disconnectBodyPart()
     {
+        if (_locker_body == null)
+        {
+            _locker_body = _bodyPartInfo.GetComponent<Rigidbody>();
+        }
         _locker_body.isKinematic = false;
 
         current_hold_id = -1;
@@ -84,6 +93,10 @@ public class EndBodyPart : MonoBehaviour
 
     public Rigidbody GetRigidBody()
     {
+        if (_locker_body == null)
+        {
+            _locker_body = _bodyPartInfo.GetComponent<Rigidbody>();
+        }
         return _locker_body;
     }
 }

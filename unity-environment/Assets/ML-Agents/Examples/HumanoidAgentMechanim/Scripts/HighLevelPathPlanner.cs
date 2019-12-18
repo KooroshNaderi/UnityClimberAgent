@@ -737,19 +737,19 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
             WriteDataPointsToFile();
         }
 
-        public float[] GetStateToHolds(int fatherNodeId, SamplingHighLevelPlan _samplePlan, bool flagAddNodes)
-        {
-            if (flagAddNodes)
-            {
-                if (fatherNodeId < 0 || fatherNodeId >= mNodes.Count)
-                {
-                    return null;
-                }
+        //public float[] GetStateToHolds(int fatherNodeId, SamplingHighLevelPlan _samplePlan, bool flagAddNodes)
+        //{
+        //    if (flagAddNodes)
+        //    {
+        //        if (fatherNodeId < 0 || fatherNodeId >= mNodes.Count)
+        //        {
+        //            return null;
+        //        }
 
-                return mController.GetStateToHolds(mNodes[fatherNodeId].stateIdx, _samplePlan._sampledTargetStanceID, masterContext);
-            }
-            return mController.GetStateToHolds(_samplePlan._sampledInitialStateSlotIdx, _samplePlan._sampledTargetStanceID, masterContext);
-        }
+        //        return mController.GetStateToHolds(mNodes[fatherNodeId].stateIdx, _samplePlan._sampledTargetStanceID, masterContext);
+        //    }
+        //    return mController.GetStateToHolds(_samplePlan._sampledInitialStateSlotIdx, _samplePlan._sampledTargetStanceID, masterContext);
+        //}
 
         // we alwayse save from masterContext
         public int SaveNodeState(SaveMode mode, SamplingHighLevelPlan _samplePlan, bool flagAddNodes)
@@ -812,19 +812,19 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
             {
                 if (addOptSamples)
                 {
-                    // input feature
-                    float[] s = GetStateToHolds(fatherNodeId, _samplePlan, flagAddNodes);
+                    //// input feature
+                    //float[] s = GetStateToHolds(fatherNodeId, _samplePlan, flagAddNodes);
 
-                    // output
-                    double[] policy = mController.GetBestSampledPolicy();
+                    //// output
+                    //double[] policy = mController.GetBestSampledPolicy();
 
-                    float[] f = mController.GetFeatureState(mController.GetBestSample()._startingSlotIndex, _samplePlan._sampledTargetStanceID, masterContext);
-                    float[] nf = mController.GetFeatureState(mController.GetBestSample()._cSlotStateIdx, _samplePlan._sampledTargetStanceID, masterContext);
+                    //float[] f = mController.GetFeatureState(mController.GetBestSample()._startingSlotIndex, _samplePlan._sampledTargetStanceID, masterContext);
+                    //float[] nf = mController.GetFeatureState(mController.GetBestSample()._cSlotStateIdx, _samplePlan._sampledTargetStanceID, masterContext);
 
-                    if (s != null && s.Length > 0 && policy.Length > 0 && nf != null && nf.Length > 0)
-                    {
-                        dataPoints.Add(new DataStr(s, f, policy, mController.GetBestSampleValue(), nf));
-                    }
+                    //if (s != null && s.Length > 0 && policy.Length > 0 && nf != null && nf.Length > 0)
+                    //{
+                    //    dataPoints.Add(new DataStr(s, f, policy, mController.GetBestSampleValue(), nf));
+                    //}
                 }
             }
 

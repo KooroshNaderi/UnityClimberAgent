@@ -59,54 +59,36 @@ public class ClimberInterface
         return controlRig.LoadState(user_trajectory_points[user_trajectory_points.Count - 1].cStateID);
     }
 
-    void AddTrajectoryPoint()
+    public void UpdateTrajectoryPoints(bool isOptimizationDone)
     {
-        user_trajectory_points.Add(new UserTrajectoryPoints());
-        user_trajectory_points[user_trajectory_points.Count - 1].cStateID = memoryManager.GetNextFreeSlotIdx();
-
-        controlRig.SaveState(user_trajectory_points[user_trajectory_points.Count - 1].cStateID);
-
-        for (int i = 0; i < 4; i++)
+        if (isOptimizationDone)
         {
-            user_trajectory_points[user_trajectory_points.Count - 1].target_ids[i] = target_hold_ids[i];
-        }
-    }
-
-    void RemoveLastTrajectoryPoint()
-    {
-        current_command_type = UserCommandType.UserNone;
-        if (isTaskCompleted)
-        {
-            if (user_trajectory_points.Count > 1)
-            {
-                user_trajectory_points.RemoveAt(user_trajectory_points.Count - 1);
-            }
-            else
-            {
-                for (int b = 0; b < 4; b++)
-                    user_trajectory_points[0].target_ids[b] = -1;
-            }
+            AddTrajectoryPoint();
+            isTaskCompleted = true;
+            current_command_type = UserCommandType.UserNone;
         }
 
-        // restoring climber's state and target stance
-        controlRig.LoadState(user_trajectory_points[user_trajectory_points.Count - 1].cStateID);
-        
-        for (int i = 0; i < 4; i++)
-        {
-            // restore to current rig's attached hold ids
-            init_hold_ids[i] = controlRig.GetCurrentHoldBodyID(i);
-            // restore to the last saved trajectory point
-            target_hold_ids[i] = user_trajectory_points[user_trajectory_points.Count - 1].target_ids[i];
-        }
-
-        isTaskCompleted = true;
         return;
     }
 
-    public void UseInterface()
+    void CheckForUserInterrupt(int limb_id, int hold_id)
     {
-        //Camera.main.GetComponent<CameraFollow>().flagFollowAgent = !useAgentInterface;
+        if (limb_id < 0)
+            return;
 
+        if (user_trajectory_points[user_trajectory_points.Count - 1].target_ids[limb_id] == hold_id)
+            return;
+
+        if (current_command_type == UserCommandType.UserForwardSimulate)
+        {
+            UpdateTrajectoryPoints(true);
+            current_command_type = UserCommandType.UserNone;
+        }
+        return;
+    }
+
+    public void UseInterface(ref SamplingHighLevelPlan _samplePlan)
+    {
         Vector3 nCameraPos = lookAtPos + camera_pos[0] * (new Vector3(Mathf.Cos(camera_pos[1]), Mathf.Sin(camera_pos[2]), Mathf.Sin(camera_pos[1]))).normalized;
         nCameraPos.y = Mathf.Max(0f, nCameraPos.y);
 
@@ -202,6 +184,7 @@ public class ClimberInterface
 
         if (Input.GetMouseButtonUp(0))
         {
+            CheckForUserInterrupt(selected_limb, selected_hold);
             current_select_state = 0;
             if (selected_limb > -1)
             {
@@ -247,34 +230,14 @@ public class ClimberInterface
         {
             current_command_type = UserCommandType.UserForwardSimulate;
 
-            //fatherNodeID = -1;
-            //graphActionIndex = -1;
             isTaskCompleted = false;
-            //task_counter_step = counter_agent_running;
             for (int b = 0; b < 4; b++)
             {
                 init_hold_ids[b] = controlRig.GetCurrentHoldBodyID(b);
                 target_hold_ids[b] = user_trajectory_points[user_trajectory_points.Count - 1].target_ids[b];
             }
-            //num_spline_done = 0;
 
-            //current_count_limb_movment = HumanoidClimberAcademy.Tools.GetDiffBtwSetASetB(target_hold_ids, init_hold_ids) - 1;
-
-            //if (agentParameters.onDemandDecision)
-            //{
-            //    RequestDecision();
-            //}
-
-            //if (useSpline)
-            //{
-            //    currentDecisionStep = 0;
-            //}
-            //else
-            //{
-            //    currentDecisionStep = 1;
-            //}
-            //isNewDecisionStep = true;
-            //spline_steps_needed = 0;
+            UpdateSampleHighLevelPlan(ref _samplePlan);
         }
 
         if (Input.GetKeyDown(KeyCode.Backspace))
@@ -284,6 +247,62 @@ public class ClimberInterface
 
         return;
     }
+
+    void UpdateSampleHighLevelPlan(ref SamplingHighLevelPlan _samplePlan)
+    {
+        _samplePlan.startingNodeID = -1;
+        for (int h = 0; h < 4; h++)
+        {
+            _samplePlan._sampledFromStanceID[h] = init_hold_ids[h];
+            _samplePlan._sampledTargetStanceID[h] = target_hold_ids[h];
+        }
+        _samplePlan._sampledInitialStateSlotIdx = user_trajectory_points[user_trajectory_points.Count - 1].cStateID;
+    }
+    
+    void AddTrajectoryPoint()
+    {
+        user_trajectory_points.Add(new UserTrajectoryPoints());
+        user_trajectory_points[user_trajectory_points.Count - 1].cStateID = memoryManager.GetNextFreeSlotIdx();
+
+        controlRig.SaveState(user_trajectory_points[user_trajectory_points.Count - 1].cStateID);
+
+        for (int i = 0; i < 4; i++)
+        {
+            user_trajectory_points[user_trajectory_points.Count - 1].target_ids[i] = target_hold_ids[i];
+        }
+    }
+
+    void RemoveLastTrajectoryPoint()
+    {
+        current_command_type = UserCommandType.UserNone;
+        if (isTaskCompleted)
+        {
+            if (user_trajectory_points.Count > 1)
+            {
+                user_trajectory_points.RemoveAt(user_trajectory_points.Count - 1);
+            }
+            else
+            {
+                for (int b = 0; b < 4; b++)
+                    user_trajectory_points[0].target_ids[b] = -1;
+            }
+        }
+
+        // restoring climber's state and target stance
+        controlRig.LoadState(user_trajectory_points[user_trajectory_points.Count - 1].cStateID);
+        
+        for (int i = 0; i < 4; i++)
+        {
+            // restore to current rig's attached hold ids
+            init_hold_ids[i] = controlRig.GetCurrentHoldBodyID(i);
+            // restore to the last saved trajectory point
+            target_hold_ids[i] = user_trajectory_points[user_trajectory_points.Count - 1].target_ids[i];
+        }
+
+        isTaskCompleted = true;
+        return;
+    }
+
 }
 
 public class TrajectoryManager : MonoBehaviour
@@ -295,6 +314,7 @@ public class TrajectoryManager : MonoBehaviour
     public bool useInterface = true;
 
     public float MaxSampleDis = 0.25f;
+    public float ConnectionThreshold = 0.25f;
     //public bool UsePPOReward = true;
     public bool ResetInitState = false;
     public float PercentFollowRef = 0.8f;
@@ -316,7 +336,7 @@ public class TrajectoryManager : MonoBehaviour
     bool isTrajectoryManagerInitialized = false;
 
     HighLevelPlanner mHighLevelPlanner = null;
-    //SamplingHighLevelPlan _samplePlan = new SamplingHighLevelPlan();
+    SamplingHighLevelPlan _samplePlan = new SamplingHighLevelPlan();
 
     int cStepAnimation = 0;
 
@@ -339,7 +359,9 @@ public class TrajectoryManager : MonoBehaviour
         {
             mNetworkManager.ConnectToLocalHost();
         }
-        
+
+        mContext.ConnectionThreshold = this.ConnectionThreshold;
+
         if (mContext.targetHoldType != targetHoldType || ToggleRandomizeScene)
         {
             if (ToggleRandomizeScene)
@@ -352,17 +374,25 @@ public class TrajectoryManager : MonoBehaviour
             mController.CopyMasterContextToOtherContexts();
         }
 
+        // setting controller properties
+        mController.MaxSampleDis = MaxSampleDis;
+        mController.MaxSampleSize = MaxSampleSize;
+        mController.PercentFollowRef = PercentFollowRef;
+        //mController.UsePPOReward = UsePPOReward;
+        mController.PlayAnimation = playAnimation;
+
         if (mClimberInterface != null)
         {
-            mClimberInterface.UseInterface();
-
+            mClimberInterface.UseInterface(ref _samplePlan);
             if (mClimberInterface.current_command_type == ClimberInterface.UserCommandType.UserNone)
             {
+                mController.ResetOptimization();
                 mClimberInterface.LoadCurrentState();
             }
             else if (mClimberInterface.current_command_type == ClimberInterface.UserCommandType.UserForwardSimulate)
             {
-                //
+                bool isDone = mController.OptimizeCost(ref _samplePlan);
+                mClimberInterface.UpdateTrajectoryPoints(isDone);
             }
         }
         // this should be moved to the low-level controller
@@ -388,12 +418,7 @@ public class TrajectoryManager : MonoBehaviour
         //          }
         //      }
 
-        //      // setting controller properties
-        //      mController.MaxSampleDis = MaxSampleDis;
-        //      mController.MaxSampleSize = MaxSampleSize;
-        //      mController.PercentFollowRef = PercentFollowRef;
-        //      //mController.UsePPOReward = UsePPOReward;
-        //      mController.PlayAnimation = playAnimation;
+
 
         ////      if (ResetInitState)
         ////      {
@@ -401,38 +426,38 @@ public class TrajectoryManager : MonoBehaviour
         ////          mController.ResetInitialStateSample();
         ////      }
 
-        //      bool isDone = mController.OptimizeCost(ref _samplePlan);
 
-        //      if (!playAnimation)
-        //      {
-        //          if (isDone)
-        //          {
-        //              int saved_id = mHighLevelPlanner.SaveNodeState(HighLevelPlanner.SaveMode.SaveBestState, _samplePlan, !useLowLevelRandomSamples);
-        //              if (!useLowLevelRandomSamples)
-        //              {
-        //                  if (saved_id == -1) // failed
-        //                  {
-        //                      mHighLevelPlanner.AddToFailedTransitions(_samplePlan);
-        //                  }
-        //              }
-        //          }
-        //      }
-        //      else
-        //      {
-        //          LowLevelController.SamplingTrajectoryStr bestSample = mController.GetBestSample();
 
-        //          if (cStepAnimation >= bestSample._sampledMaxStep || cStepAnimation < 0)
-        //              cStepAnimation = 0;
-        //          mController.LoadState(mController.GetMasterTrajectoryIdx(), bestSample._fromToStates[cStepAnimation]);
-        //          cStepAnimation += 3;
-        //      }
+        //if (!playAnimation)
+        //{
+        //    if (isDone)
+        //    {
+        //        int saved_id = mHighLevelPlanner.SaveNodeState(HighLevelPlanner.SaveMode.SaveBestState, _samplePlan, !useLowLevelRandomSamples);
+        //        if (!useLowLevelRandomSamples)
+        //        {
+        //            if (saved_id == -1) // failed
+        //            {
+        //                mHighLevelPlanner.AddToFailedTransitions(_samplePlan);
+        //            }
+        //        }
+        //    }
+        //}
+        //else
+        //{
+        //    LowLevelController.SamplingTrajectoryStr bestSample = mController.GetBestSample();
 
-        //      //drawStar(_controlRigs[GetMasterTrajectoryIdx()].getEndBonePosition(0) + _controlRigs[GetMasterTrajectoryIdx()].initialBiasPosition);
-        //      //drawStar(_controlRigs[GetMasterTrajectoryIdx()].getEndBonePosition(1) + _controlRigs[GetMasterTrajectoryIdx()].initialBiasPosition);
-        //      //drawStar(_controlRigs[GetMasterTrajectoryIdx()].getEndBonePosition(2) + _controlRigs[GetMasterTrajectoryIdx()].initialBiasPosition);
-        //      //drawStar(_controlRigs[GetMasterTrajectoryIdx()].getEndBonePosition(3) + _controlRigs[GetMasterTrajectoryIdx()].initialBiasPosition);
+        //    if (cStepAnimation >= bestSample._sampledMaxStep || cStepAnimation < 0)
+        //        cStepAnimation = 0;
+        //    mController.LoadState(mController.GetMasterTrajectoryIdx(), bestSample._fromToStates[cStepAnimation]);
+        //    cStepAnimation += 3;
+        //}
 
-        //      textbox.text = Time.time.ToString();
+        //drawStar(_controlRigs[GetMasterTrajectoryIdx()].getEndBonePosition(0) + _controlRigs[GetMasterTrajectoryIdx()].initialBiasPosition);
+        //drawStar(_controlRigs[GetMasterTrajectoryIdx()].getEndBonePosition(1) + _controlRigs[GetMasterTrajectoryIdx()].initialBiasPosition);
+        //drawStar(_controlRigs[GetMasterTrajectoryIdx()].getEndBonePosition(2) + _controlRigs[GetMasterTrajectoryIdx()].initialBiasPosition);
+        //drawStar(_controlRigs[GetMasterTrajectoryIdx()].getEndBonePosition(3) + _controlRigs[GetMasterTrajectoryIdx()].initialBiasPosition);
+
+        textbox.text = Time.time.ToString() + "\n State Cost: " + (-mController.GetBestSampleValue()).ToString("f3");
     }
 
     void drawStar(Vector3 p)

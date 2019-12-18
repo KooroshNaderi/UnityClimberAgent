@@ -89,8 +89,8 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
                                        //private const int _sampleSize = _UseSpline 
                                        //                              ? nControlPoints * (1 + nAngle /*time + nAngle*/) + 4 /*time to let go of the hands and feet*/
                                        //                              : nAngle;
-        private const int _maxOptIter = 60;//120
-        private const int _maxFixedOptIter = 10;//20
+        private const int _maxOptIter = 120;
+        private const int _maxFixedOptIter = 20;
         private const float _fixedThresholdCost = 50.0f;
         private const int maxCountHandsDisconnected = 5;
         private const int nNNEvalTrajectories = 0;
@@ -174,6 +174,7 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
                     ClimberMechanimRig _climberMechanimRig = g.GetComponentsInChildren<ClimberMechanimRig>()[0];
                     _climberMechanimRig._trajectoryIdx = trajectoryIdx++;
                     _climberMechanimRig.mClimberMemory = iMemory;
+                    _climberMechanimRig.Initialize();
                     _controlRigs.Add(_climberMechanimRig);
 
                     // g.GetComponent<MeshRenderer>().enabled = false;
@@ -218,6 +219,7 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
             ClimberMechanimRig _climberMechanimMasterRig = _instantObj.GetComponentsInChildren<ClimberMechanimRig>()[0];
             _climberMechanimMasterRig._trajectoryIdx = trajectoryIdx;
             _climberMechanimMasterRig.mClimberMemory = iMemory;
+            _climberMechanimMasterRig.Initialize();
             _controlRigs.Add(_climberMechanimMasterRig);
             masterContextIdx = trajectoryIdx;
 
@@ -1465,7 +1467,7 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
                         }
                     }
 
-                    UnityEngine.Debug.Log("state cost:" + (_trajectorySamples[_bestTrajectoryIdx].state_cost).ToString("f3"));
+                    //debuggingText.text += ", state cost:" + (_trajectorySamples[_bestTrajectoryIdx].state_cost).ToString("f3");// UnityEngine.Debug.Log();
 
                     _iter++;
                     if (_opt.getBestObjectiveFuncValue() - bestPreSample.objectiveFuncVal > _fixedThresholdCost)
@@ -1958,86 +1960,86 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
             if (!flag_writeToFile)
                 return;
 
-            for (int t = nOptimizationSamples; t < curNumTrajectories; t++)
-            {
-                int[] target_holds = _trajectorySamples[t].targetHoldIds;
-                int[] cur_holds = _controlRigs[t].GetCurrentHoldIds();
-                bool success_transition = MyTools.IsStanceAEqualStanceB(target_holds, cur_holds);
+            //for (int t = nOptimizationSamples; t < curNumTrajectories; t++)
+            //{
+            //    int[] target_holds = _trajectorySamples[t].targetHoldIds;
+            //    int[] cur_holds = _controlRigs[t].GetCurrentHoldIds();
+            //    bool success_transition = MyTools.IsStanceAEqualStanceB(target_holds, cur_holds);
 
-                string cPath = "Learning\\Data\\Data" + current_written_file.ToString() + ".txt";
-                if (mFileWriter == null)
-                {
-                    mFileWriter = new StreamWriter(cPath, true);
-                }
-                string write_eval = "";
-                int cIndex = 0;
+            //    string cPath = "Learning\\Data\\Data" + current_written_file.ToString() + ".txt";
+            //    if (mFileWriter == null)
+            //    {
+            //        mFileWriter = new StreamWriter(cPath, true);
+            //    }
+            //    string write_eval = "";
+            //    int cIndex = 0;
 
-                // write exprience and success
-                int cur_itr_expreince = 0; cIndex++;// (int)nnEvalReply[t - nOptimizationSamples][cIndex]; cIndex++;
-                int cur_success_itr = 0; cIndex++;// (int)nnEvalReply[t - nOptimizationSamples][cIndex]; cIndex++;
-                if (success_transition)
-                {
-                    cur_success_itr++;
-                }
-                write_eval = write_eval + (cur_itr_expreince + 1).ToString() + ",";
-                write_eval = write_eval + cur_success_itr.ToString() + ",";
+            //    // write exprience and success
+            //    int cur_itr_expreince = 0; cIndex++;// (int)nnEvalReply[t - nOptimizationSamples][cIndex]; cIndex++;
+            //    int cur_success_itr = 0; cIndex++;// (int)nnEvalReply[t - nOptimizationSamples][cIndex]; cIndex++;
+            //    if (success_transition)
+            //    {
+            //        cur_success_itr++;
+            //    }
+            //    write_eval = write_eval + (cur_itr_expreince + 1).ToString() + ",";
+            //    write_eval = write_eval + cur_success_itr.ToString() + ",";
 
-                int state_length = (int)nnEvalReply[t - nOptimizationSamples][cIndex]; cIndex++;
-                write_eval = write_eval + state_length.ToString() + ",";
-                for (int i = 0; i < state_length; i++)
-                {
-                    write_eval = write_eval + nnEvalReply[t - nOptimizationSamples][cIndex].ToString() + ","; cIndex++;
-                }
+            //    int state_length = (int)nnEvalReply[t - nOptimizationSamples][cIndex]; cIndex++;
+            //    write_eval = write_eval + state_length.ToString() + ",";
+            //    for (int i = 0; i < state_length; i++)
+            //    {
+            //        write_eval = write_eval + nnEvalReply[t - nOptimizationSamples][cIndex].ToString() + ","; cIndex++;
+            //    }
 
-                int holds_length = (int)nnEvalReply[t - nOptimizationSamples][cIndex]; cIndex++;
-                write_eval = write_eval + holds_length.ToString() + ",";
-                for (int i = 0; i < holds_length; i++)
-                {
-                    write_eval = write_eval + nnEvalReply[t - nOptimizationSamples][cIndex].ToString() + ","; cIndex++;
-                }
+            //    int holds_length = (int)nnEvalReply[t - nOptimizationSamples][cIndex]; cIndex++;
+            //    write_eval = write_eval + holds_length.ToString() + ",";
+            //    for (int i = 0; i < holds_length; i++)
+            //    {
+            //        write_eval = write_eval + nnEvalReply[t - nOptimizationSamples][cIndex].ToString() + ","; cIndex++;
+            //    }
 
-                int _sampleSize = nControlPoints * (1 + nAngle /*time + nAngle*/) + 4 /*time to let go of the hands and feet*/;
-                int action_length = (int)_sampleSize; cIndex++;
-                write_eval = write_eval + (action_length).ToString() + ",";
-                for (int i = 0; i < action_length; i++)
-                {
-                    write_eval = write_eval + nnEvalReply[t - nOptimizationSamples][cIndex].ToString() + ","; cIndex++;
-                }
+            //    int _sampleSize = nControlPoints * (1 + nAngle /*time + nAngle*/) + 4 /*time to let go of the hands and feet*/;
+            //    int action_length = (int)_sampleSize; cIndex++;
+            //    write_eval = write_eval + (action_length).ToString() + ",";
+            //    for (int i = 0; i < action_length; i++)
+            //    {
+            //        write_eval = write_eval + nnEvalReply[t - nOptimizationSamples][cIndex].ToString() + ","; cIndex++;
+            //    }
 
-                Vector2 cValue = GetDisCurEndPointToTarget(_trajectorySamples[t]._cSlotStateIdx, t);//_trajectorySamples[t].objectiveFuncVal;// + nnEvalReply[t - nOptimizationSamples][cIndex];
-                write_eval = write_eval + (cValue[0]).ToString() + ",";
+            //    Vector2 cValue = GetDisCurEndPointToTarget(_trajectorySamples[t]._cSlotStateIdx, t);//_trajectorySamples[t].objectiveFuncVal;// + nnEvalReply[t - nOptimizationSamples][cIndex];
+            //    write_eval = write_eval + (cValue[0]).ToString() + ",";
 
-                float[] featureState = GetFeatureState(_trajectorySamples[t]._startingSlotIndex, target_holds, t);
-                for (int i = 0; i < featureState.Length; i++)
-                {
-                    write_eval = write_eval + featureState[i].ToString() + ",";
-                }
+            //    float[] featureState = GetFeatureState(_trajectorySamples[t]._startingSlotIndex, target_holds, t);
+            //    for (int i = 0; i < featureState.Length; i++)
+            //    {
+            //        write_eval = write_eval + featureState[i].ToString() + ",";
+            //    }
 
-                float[] nfeatureState = GetFeatureState(_trajectorySamples[t]._cSlotStateIdx, target_holds, t);
-                for (int i = 0; i < featureState.Length; i++)
-                {
-                    if (i == featureState.Length - 1)
-                    {
-                        write_eval = write_eval + featureState[i].ToString();
-                    }
-                    else
-                    {
-                        write_eval = write_eval + featureState[i].ToString() + ",";
-                    }
-                }
+            //    float[] nfeatureState = GetFeatureState(_trajectorySamples[t]._cSlotStateIdx, target_holds, t);
+            //    for (int i = 0; i < featureState.Length; i++)
+            //    {
+            //        if (i == featureState.Length - 1)
+            //        {
+            //            write_eval = write_eval + featureState[i].ToString();
+            //        }
+            //        else
+            //        {
+            //            write_eval = write_eval + featureState[i].ToString() + ",";
+            //        }
+            //    }
 
-                mFileWriter.WriteLine(write_eval);
-                current_written_data_index++;
-                if (current_written_data_index > 100)
-                {
-                    current_written_data_index = 0;
-                    current_written_file++;
+            //    mFileWriter.WriteLine(write_eval);
+            //    current_written_data_index++;
+            //    if (current_written_data_index > 100)
+            //    {
+            //        current_written_data_index = 0;
+            //        current_written_file++;
 
-                    mFileWriter.Flush();
-                    mFileWriter.Close();
-                    mFileWriter = null;
-                }
-            }
+            //        mFileWriter.Flush();
+            //        mFileWriter.Close();
+            //        mFileWriter = null;
+            //    }
+            //}
         }
 
         //    public void FinilizeLowLevelController()
@@ -2124,6 +2126,8 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
             bestPreSample._sampledMaxStep = -1;
 
             neuralNetSampleVal = double.MinValue;
+
+            CopyMasterContextToOtherContexts();
         }
 
         void ConvertToSampleAction(int _t, bool use_opt_samples)
@@ -2382,6 +2386,7 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
                     _controlRigs[i].GetContextManager().SetHoldRotation(h, master_context.GetHoldRotation(h));
                 }
                 _controlRigs[i].GetContextManager().targetHoldType = master_context.targetHoldType;
+                _controlRigs[i].GetContextManager().ConnectionThreshold = master_context.ConnectionThreshold;
             }
         }
 
@@ -2405,71 +2410,87 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
             return (bestPreSample.objectiveFuncVal >= neuralNetSampleVal) && bestPreSample.isReached;
         }
 
-        public float[] GetStateToHolds(int stateIdx, int[] tHoldIDs, int contextIdx)
+        public void ResetOptimization()
         {
-            List<float> outState = new List<float>();
-
-            int cIndex = outState.Count + 1;
-
-            MyTools.PushStateFeature(ref outState, 0);
-            mMemory.GetState(stateIdx, ref outState);
-            outState[cIndex - 1] = outState.Count - cIndex;
-
-            cIndex = outState.Count + 1;
-            MyTools.PushStateFeature(ref outState, 0);
-
-            int[] cHoldIds = new int[4];
-            mMemory.GetHoldIds(stateIdx, ref cHoldIds);
-            for (int i = 0; i < 4; i++)
+            if (_iter > 0)
             {
-                MyTools.PushStateFeature(ref outState, cHoldIds[i]);
-            }
-            for (int i = 0; i < 4; i++)
-            {
-                MyTools.PushStateFeature(ref outState, _controlRigs[contextIdx].GetContextManager().GetHoldPosition(cHoldIds[i]));
+                EndOptimization();
             }
 
-            int count_diff = 0;
-            for (int i = 0; i < 4; i++)
+            for (int t = 0; t < nOptimizationSamples; t++)
             {
-                if (cHoldIds[i] != tHoldIDs[i])
-                    count_diff++;
-                MyTools.PushStateFeature(ref outState, tHoldIDs[i]);
+                _trajectorySamples[t].ResetFlag = true;
+                _trajectorySamples[t]._cSimulationStep = 0;
+                _trajectorySamples[t].isActionDone = false;
+                _trajectorySamples[t].isReached = false;
             }
-
-            for (int i = 0; i < 4; i++)
-            {
-                MyTools.PushStateFeature(ref outState, _controlRigs[contextIdx].GetContextManager().GetHoldPosition(tHoldIDs[i]));
-            }
-            outState[cIndex - 1] = outState.Count - cIndex;
-
-            return outState.ToArray();
         }
 
-        public float[] GetFeatureState(int stateIdx, int[] tHoldIDs, int contextIdx)
-        {
-            //bool use_endpoint_as_target = false;
-            List<float> outState = new List<float>();
-            outState.Add(0);
-            Vector3[] tHoldPoses = { new Vector3(), new Vector3(), new Vector3(), new Vector3() };
-            for (int i = 0; i < 4; i++)
-                tHoldPoses[i] = _controlRigs[contextIdx].GetContextManager().GetHoldPosition(tHoldIDs[i]);
+        //public float[] GetStateToHolds(int stateIdx, int[] tHoldIDs, int contextIdx)
+        //{
+        //    List<float> outState = new List<float>();
 
-            int[] boneIndices = { 1, 2, 3, 4, 6, 7, 9, 10, 12, 13 };
+        //    int cIndex = outState.Count + 1;
 
-            if (contextIdx == masterContextIdx && contextIdx > _trajectorySamples.Count) // this is used for opt
-            {
-                outState.Add(0);
-                mMemory.GetFeatureState(stateIdx, ref outState, ref _trajectorySamples[0].targetHoldIds, ref tHoldPoses, boneIndices);
-            }
-            else
-            {
-                outState.Add(_trajectorySamples[contextIdx]._cSimulationStep);
-                mMemory.GetFeatureState(stateIdx, ref outState, ref _trajectorySamples[contextIdx].targetHoldIds, ref tHoldPoses, boneIndices);
-            }
-            outState[0] = outState.Count - 1;
-            return outState.ToArray();
-        }
+        //    MyTools.PushStateFeature(ref outState, 0);
+        //    mMemory.GetState(stateIdx, ref outState);
+        //    outState[cIndex - 1] = outState.Count - cIndex;
+
+        //    cIndex = outState.Count + 1;
+        //    MyTools.PushStateFeature(ref outState, 0);
+
+        //    int[] cHoldIds = new int[4];
+        //    mMemory.GetHoldIds(stateIdx, ref cHoldIds);
+        //    for (int i = 0; i < 4; i++)
+        //    {
+        //        MyTools.PushStateFeature(ref outState, cHoldIds[i]);
+        //    }
+        //    for (int i = 0; i < 4; i++)
+        //    {
+        //        MyTools.PushStateFeature(ref outState, _controlRigs[contextIdx].GetContextManager().GetHoldPosition(cHoldIds[i]));
+        //    }
+
+        //    int count_diff = 0;
+        //    for (int i = 0; i < 4; i++)
+        //    {
+        //        if (cHoldIds[i] != tHoldIDs[i])
+        //            count_diff++;
+        //        MyTools.PushStateFeature(ref outState, tHoldIDs[i]);
+        //    }
+
+        //    for (int i = 0; i < 4; i++)
+        //    {
+        //        MyTools.PushStateFeature(ref outState, _controlRigs[contextIdx].GetContextManager().GetHoldPosition(tHoldIDs[i]));
+        //    }
+        //    outState[cIndex - 1] = outState.Count - cIndex;
+
+        //    return outState.ToArray();
+        //}
+
+        //public float[] GetFeatureState(int stateIdx, int[] tHoldIDs, int contextIdx)
+        //{
+        //    //bool use_endpoint_as_target = false;
+        //    List<float> outState = new List<float>();
+        //    outState.Add(0);
+        //    Vector3[] tHoldPoses = { new Vector3(), new Vector3(), new Vector3(), new Vector3() };
+        //    for (int i = 0; i < 4; i++)
+        //        tHoldPoses[i] = _controlRigs[contextIdx].GetContextManager().GetHoldPosition(tHoldIDs[i]);
+
+        //    int[] boneIndices = { 1, 2, 3, 4, 6, 7, 9, 10, 12, 13 };
+
+        //    if (contextIdx == masterContextIdx && contextIdx > _trajectorySamples.Count) // this is used for opt
+        //    {
+        //        outState.Add(0);
+        //        mMemory.GetFeatureState(stateIdx, ref outState, ref _trajectorySamples[0].targetHoldIds, ref tHoldPoses, boneIndices);
+        //    }
+        //    else
+        //    {
+        //        outState.Add(_trajectorySamples[contextIdx]._cSimulationStep);
+        //        mMemory.GetFeatureState(stateIdx, ref outState, ref _trajectorySamples[contextIdx].targetHoldIds, ref tHoldPoses, boneIndices);
+        //    }
+        //    outState[0] = outState.Count - 1;
+        //    return outState.ToArray();
+        //}
         
     }
     

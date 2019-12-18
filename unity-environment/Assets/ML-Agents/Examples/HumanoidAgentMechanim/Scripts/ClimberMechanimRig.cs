@@ -8,7 +8,8 @@ public class ClimberMechanimRig : HumanoidMecanimRig
     public class ClimberBodyState
     {
         static int humanoid_action_dof = 30;
-        public ClimberBodyState()
+
+        void InitVariables()
         {
             connectorPos = new Vector3[4];
             connectorRot = new Quaternion[4];
@@ -18,7 +19,49 @@ public class ClimberMechanimRig : HumanoidMecanimRig
             spline_init_values = new Vector2[humanoid_action_dof];
         }
 
-        public int HumanoidBodyStateID { get; set; } = -1;
+        public ClimberBodyState()
+        {
+            InitVariables();
+        }
+
+        public ClimberBodyState(ClimberBodyState _c)
+        {
+            InitVariables();
+            Copy(_c);
+        }
+
+        public void Copy(ClimberBodyState _c)
+        {
+            HumanoidBodyState.Copy(_c.HumanoidBodyState);
+
+            for (int h = 0; h < 4; h++)
+            {
+                hold_bodies_ids[h] = _c.hold_bodies_ids[h];
+                current_hold_pos[h] = _c.current_hold_pos[h];
+                current_hold_rot[h] = _c.current_hold_rot[h];
+                current_hold_type[h] = _c.current_hold_type[h];
+
+                end_bodies_pos[h] = _c.end_bodies_pos[h];
+            }
+
+            hipLocation = _c.hipLocation;
+
+            for (int h = 0; h < 4; h++)
+            {
+                connectorPos[h] = _c.connectorPos[h];
+                connectorRot[h] = _c.connectorRot[h];
+                connectorVel[h] = _c.connectorVel[h];
+                connectorAVel[h] = _c.connectorAVel[h];
+            }
+
+            for (int i = 0; i < humanoid_action_dof; i++)
+            {
+                spline_init_values[i] = _c.spline_init_values[i];
+            }
+            return;
+        }
+
+        public HumanoidBodyState HumanoidBodyState = new HumanoidBodyState();
 
         public int[] hold_bodies_ids = { -1, -1, -1, -1 };
         public Vector3[] current_hold_pos = new Vector3[4];
@@ -115,13 +158,8 @@ public class ClimberMechanimRig : HumanoidMecanimRig
 
         if (_freeSlotIdx >= 0 && _freeSlotIdx < mClimberMemory.savedStates.Count)
         {
-            if (mClimberMemory.savedStates[_freeSlotIdx].HumanoidBodyStateID < 0)
-            {
-                mClimberMemory.savedStates[_freeSlotIdx].HumanoidBodyStateID = this.getNextFreeSavingSlot();
-            }
-
             // until this point all body state is saved
-            base.SaveState(mClimberMemory.savedStates[_freeSlotIdx].HumanoidBodyStateID);
+            base._SaveState(mClimberMemory.savedStates[_freeSlotIdx].HumanoidBodyState);
 
             // now save current stance ids and positions
             for (int h = 0; h < 4; h++)
@@ -177,10 +215,7 @@ public class ClimberMechanimRig : HumanoidMecanimRig
                 connectBodyParts[b].disconnectBodyPart();
 
             // load all body state
-            if (mClimberMemory.savedStates[_state_id].HumanoidBodyStateID >= 0)
-            {
-                base.LoadState(mClimberMemory.savedStates[_state_id].HumanoidBodyStateID);
-            }
+            base._LoadState(mClimberMemory.savedStates[_state_id].HumanoidBodyState);
             
             // now load current stance info
             for (int h = 0; h < 4; h++)
@@ -215,7 +250,7 @@ public class ClimberMechanimRig : HumanoidMecanimRig
             for (int b = 0; b < 4; b++)
             {
                 int c_hold_id = mClimberMemory.savedStates[_state_id].hold_bodies_ids[b];
-                if (c_hold_id > 0)
+                if (c_hold_id >= 0)
                     connectBodyParts[b].connectBodyPart(c_hold_id);
             }
 
@@ -248,7 +283,7 @@ public class ClimberMechanimRig : HumanoidMecanimRig
                 Vector3 contact_pos_i = GetEndBonePosition(i);
                 float dis_i = (hold_pos_i - contact_pos_i).magnitude;
 
-                float _connectionThreshold = 0.5f * ContextManager.HoldSize;
+                float _connectionThreshold = mContextInfo.ConnectionThreshold;
 
                 if (dis_i <= _connectionThreshold)
                 {

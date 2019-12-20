@@ -51,37 +51,37 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
             public List<int> _fromToStates = new List<int>();
         };
 
-        private int _MaxSampleSize = 10;
-        private float _MaxSampleDis = 0.25f;
-        private bool _PlayAnimation = false;
-        private bool _UsePPOReward = false;
-        bool _ReplayExpreinces = false;
-        public bool ReplayExpreinces
-        {
-            get { return _ReplayExpreinces; }
-            set { _ReplayExpreinces = value; }
-        }
-        public bool PlayAnimation
-        {
-            get { return _PlayAnimation; }
-            set { _PlayAnimation = value; }
-        }
-        float _PercentFollowRef = 0.8f;
-        public float PercentFollowRef
-        {
-            get { return _PercentFollowRef; }
-            set { _PercentFollowRef = value; }
-        }
-        public float MaxSampleDis
-        {
-            get { return _MaxSampleDis; }
-            set { _MaxSampleDis = value; }
-        }
-        public int MaxSampleSize
-        {
-            get { return _MaxSampleSize; }
-            set { _MaxSampleSize = value; }
-        }
+        //private int _MaxSampleSize = 10;
+        //private float _MaxSampleDis = 0.25f;
+        //private bool _PlayAnimation = false;
+        //private bool _UsePPOReward = false;
+        //bool _ReplayExpreinces = false;
+        //public bool ReplayExpreinces
+        //{
+        //    get { return _ReplayExpreinces; }
+        //    set { _ReplayExpreinces = value; }
+        //}
+        //public bool PlayAnimation
+        //{
+        //    get { return _PlayAnimation; }
+        //    set { _PlayAnimation = value; }
+        //}
+        //float _PercentFollowRef = 0.8f;
+        //public float PercentFollowRef
+        //{
+        //    get { return _PercentFollowRef; }
+        //    set { _PercentFollowRef = value; }
+        //}
+        //public float MaxSampleDis
+        //{
+        //    get { return _MaxSampleDis; }
+        //    set { _MaxSampleDis = value; }
+        //}
+        //public int MaxSampleSize
+        //{
+        //    get { return _MaxSampleSize; }
+        //    set { _MaxSampleSize = value; }
+        //}
 
         private const bool cmaesLinearInterpolation = false;
         private const int nControlPoints = 2;
@@ -990,10 +990,10 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
 
         float ComputeControlCost(int targetContext)
         {
-            if (_UsePPOReward)
-            {
-                return 0.0f;
-            }
+            //if (_UsePPOReward)
+            //{
+            //    return 0.0f;
+            //}
             const bool calculateForceOnBodies = true;
             float result = 0;
 
@@ -1110,8 +1110,8 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
             float velSd = 100.0f;  //velSd only needed for C-PBP to reduce noise
             float chestDirSd = 0.05f;
 
-            if (_UsePPOReward)
-            {
+            //if (_UsePPOReward)
+            //{
                 //int ref_trajectory_idx = _trajectoryIdx - nOptimizationSamples;
 
                 //float pose_rew = 0, vel_rew = 0, end_effector_ref_rew = 0, end_effector_target, com_rew = 0;
@@ -1177,7 +1177,7 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
                 //if (isLastStep)
                 //    return -rew;
                 //return 0.0f;
-            }
+            //}
             int[] targetHoldIDs = _trajectorySamples[_trajectoryIdx].targetHoldIds;
             float stateCost = 0;
             float preStateCost = 0;
@@ -1342,143 +1342,143 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
 
         public bool OptimizeCost(ref SamplingHighLevelPlan _samplePlan)
         {
-            if (_PlayAnimation)
+            //if (_PlayAnimation)
+            //{
+            //    bool flag_start_over = true;
+            //    for (int t = 0; t < nOptimizationSamples + nNNEvalTrajectories; t++)
+            //    {
+            //        if (curShownState < _trajectorySamples[t]._cMemoryStepUsed
+            //            && curShownState < _trajectorySamples[t]._fromToStates.Count
+            //            && _trajectorySamples[t]._fromToStates[curShownState] >= 0)
+            //        {
+            //            _controlRigs[t].LoadState(_trajectorySamples[t]._fromToStates[curShownState]);
+            //            flag_start_over = false;
+            //        }
+            //        else
+            //        {
+            //            if (_trajectorySamples[t]._cSlotStateIdx >= 0)
+            //                _controlRigs[t].LoadState(_trajectorySamples[t]._cSlotStateIdx);
+            //            else
+            //                _controlRigs[t].LoadState(reset_memory_idx);
+            //        }
+            //    }
+            //    curShownState += 3;
+            //    if (flag_start_over)
+            //        curShownState = 0;
+            //}
+            //else
+            //{
+            int curNumTrajectories = InitTrajectories(ref _samplePlan);
+            // in each iteration we generate control points, in iter = 0 we generate them from uniform dist otherwise it is generated from cma-es
+            GenerateControlPoints(_iter == 0);
+
+            // Update actions for nn evaluation
+            for (int _t = nOptimizationSamples; _t < curNumTrajectories; _t++)
             {
-                bool flag_start_over = true;
-                for (int t = 0; t < nOptimizationSamples + nNNEvalTrajectories; t++)
-                {
-                    if (curShownState < _trajectorySamples[t]._cMemoryStepUsed
-                        && curShownState < _trajectorySamples[t]._fromToStates.Count
-                        && _trajectorySamples[t]._fromToStates[curShownState] >= 0)
-                    {
-                        _controlRigs[t].LoadState(_trajectorySamples[t]._fromToStates[curShownState]);
-                        flag_start_over = false;
-                    }
-                    else
-                    {
-                        if (_trajectorySamples[t]._cSlotStateIdx >= 0)
-                            _controlRigs[t].LoadState(_trajectorySamples[t]._cSlotStateIdx);
-                        else
-                            _controlRigs[t].LoadState(reset_memory_idx);
-                    }
-                }
-                curShownState += 3;
-                if (flag_start_over)
-                    curShownState = 0;
+                ConvertToSampleAction(_t, false);
             }
-            else
+
+            bool flag_opt_samples_done = ForwardSimulation(curNumTrajectories);
+
+            // update trajectory info
+            for (int t = nOptimizationSamples; t < curNumTrajectories; t++)
             {
-                int curNumTrajectories = InitTrajectories(ref _samplePlan);
-                // in each iteration we generate control points, in iter = 0 we generate them from uniform dist otherwise it is generated from cma-es
-                GenerateControlPoints(_iter == 0);
-
-                // Update actions for nn evaluation
-                for (int _t = nOptimizationSamples; _t < curNumTrajectories; _t++)
+                if (_trajectorySamples[t].isActionDone)
                 {
-                    ConvertToSampleAction(_t, false);
-                }
-
-                bool flag_opt_samples_done = ForwardSimulation(curNumTrajectories);
-
-                // update trajectory info
-                for (int t = nOptimizationSamples; t < curNumTrajectories; t++)
-                {
-                    if (_trajectorySamples[t].isActionDone)
-                    {
-                        if (_trajectorySamples[t]._cSimulationStep >= MaxStepsInOptSample
-                            || _trajectorySamples[t]._UseSpline
-                            || _trajectorySamples[t].isReached)
-                        {
-                            _trajectorySamples[t]._cMemoryStepUsed = _trajectorySamples[t]._cSimulationStep;
-                            _trajectorySamples[t]._cSimulationStep = 0;
-                            // send signal that trajectory is finished, restart for another trajectory
-                            _trajectorySamples[t].ResetFlag = true;
-                        }
-                    }
-                }
-
-                if (nOptimizationSamples > 0 && flag_opt_samples_done && !_ReplayExpreinces)
-                {
-                    // here one iter of opt is done
-                    // reset opt samples
-                    for (int t = 0; t < nOptimizationSamples; t++)
+                    if (_trajectorySamples[t]._cSimulationStep >= MaxStepsInOptSample
+                        || _trajectorySamples[t]._UseSpline
+                        || _trajectorySamples[t].isReached)
                     {
                         _trajectorySamples[t]._cMemoryStepUsed = _trajectorySamples[t]._cSimulationStep;
                         _trajectorySamples[t]._cSimulationStep = 0;
+                        // send signal that trajectory is finished, restart for another trajectory
                         _trajectorySamples[t].ResetFlag = true;
                     }
-                    // update cma-es mean and variance
-                    _opt.update(_samples);
+                }
+            }
 
-                    //bestPreSample.objectiveFuncVal = _trajectorySamples[0].objectiveFuncVal;
+            if (nOptimizationSamples > 0 && flag_opt_samples_done) //  && !_ReplayExpreinces
+            {
+                // here one iter of opt is done
+                // reset opt samples
+                for (int t = 0; t < nOptimizationSamples; t++)
+                {
+                    _trajectorySamples[t]._cMemoryStepUsed = _trajectorySamples[t]._cSimulationStep;
+                    _trajectorySamples[t]._cSimulationStep = 0;
+                    _trajectorySamples[t].ResetFlag = true;
+                }
+                // update cma-es mean and variance
+                _opt.update(_samples);
 
-                    int _bestTrajectoryIdx = -1;
-                    double _opt_obj_value = float.MinValue;
-                    if (nOptimizationSamples > 0)
+                //bestPreSample.objectiveFuncVal = _trajectorySamples[0].objectiveFuncVal;
+
+                int _bestTrajectoryIdx = -1;
+                double _opt_obj_value = float.MinValue;
+                if (nOptimizationSamples > 0)
+                {
+                    _bestTrajectoryIdx = _opt.getBestIndex();
+                    _opt_obj_value = _opt.getBestObjectiveFuncValue();
+                }
+                else if (curNumTrajectories > 0)
+                {
+                    /////////////////////////////////////// TODO: if we do not have any opt, search for best manually
+                    _bestTrajectoryIdx = 0;
+                }
+                // store best sample
+                if (_bestTrajectoryIdx > -1)
+                {
+                    int _sampleSize = nControlPoints * (1 + nAngle /*time + nAngle*/) + 4 /*time to let go of the hands and feet*/;
+                    if (_iter == 0 || _opt_obj_value > bestPreSample.objectiveFuncVal + _fixedThresholdCost)
                     {
-                        _bestTrajectoryIdx = _opt.getBestIndex();
-                        _opt_obj_value = _opt.getBestObjectiveFuncValue();
-                    }
-                    else if (curNumTrajectories > 0)
-                    {
-                        /////////////////////////////////////// TODO: if we do not have any opt, search for best manually
-                        _bestTrajectoryIdx = 0;
-                    }
-                    // store best sample
-                    if (_bestTrajectoryIdx > -1)
-                    {
-                        int _sampleSize = nControlPoints * (1 + nAngle /*time + nAngle*/) + 4 /*time to let go of the hands and feet*/;
-                        if (_iter == 0 || _opt_obj_value > bestPreSample.objectiveFuncVal + _fixedThresholdCost)
+                        if (_iter == 0)
                         {
-                            if (_iter == 0)
-                            {
-                                neuralNetSampleVal = _trajectorySamples[0].objectiveFuncVal;
-                            }
-
-                            if (nOptimizationSamples > 0)
-                            {
-                                BestSample.objectiveFuncVal = _opt.getBestObjectiveFuncValue();
-                                for (int c = 0; c < _sampleSize; c++)
-                                    BestSample.x[c] = _opt.getBest()[c];
-                            }
-
-                            bestPreSample.objectiveFuncVal = _trajectorySamples[_bestTrajectoryIdx].objectiveFuncVal;
-                            bestPreSample.state_cost = _trajectorySamples[_bestTrajectoryIdx].state_cost;
-                            bestPreSample.control_cost = _trajectorySamples[_bestTrajectoryIdx].control_cost;
-                            bestPreSample._sampledMaxStep = _trajectorySamples[_bestTrajectoryIdx]._sampledMaxStep;
-                            for (int i = 0; i < _sampleSize; i++)
-                                bestPreSample._sampledAction[i] = _trajectorySamples[_bestTrajectoryIdx]._sampledAction[i];
-
-                            for (int i = 0; i < 4; i++)
-                            {
-                                bestPreSample.targetHoldIds[i] = _trajectorySamples[_bestTrajectoryIdx].targetHoldIds[i];
-                            }
-
-                            bestPreSample._sampledMaxStep = _trajectorySamples[_bestTrajectoryIdx]._sampledMaxStep;
-
-                            mMemory.SaveState(bestPreSample._cSlotStateIdx, _trajectorySamples[_bestTrajectoryIdx]._cSlotStateIdx);
-                            mMemory.SaveState(bestPreSample._startingSlotIndex, _trajectorySamples[_bestTrajectoryIdx]._startingSlotIndex);
-                            for (int _s = 0; _s < _trajectorySamples[_bestTrajectoryIdx]._sampledMaxStep; _s++)
-                            {
-                                mMemory.SaveState(bestPreSample._fromToStates[_s], _trajectorySamples[_bestTrajectoryIdx]._fromToStates[_s]);
-                            }
-
-                            bestPreSample.isReached = _trajectorySamples[_bestTrajectoryIdx].isReached;
+                            neuralNetSampleVal = _trajectorySamples[0].objectiveFuncVal;
                         }
-                    }
 
-                    //debuggingText.text += ", state cost:" + (_trajectorySamples[_bestTrajectoryIdx].state_cost).ToString("f3");// UnityEngine.Debug.Log();
+                        if (nOptimizationSamples > 0)
+                        {
+                            BestSample.objectiveFuncVal = _opt.getBestObjectiveFuncValue();
+                            for (int c = 0; c < _sampleSize; c++)
+                                BestSample.x[c] = _opt.getBest()[c];
+                        }
 
-                    _iter++;
-                    if (_opt.getBestObjectiveFuncValue() - bestPreSample.objectiveFuncVal > _fixedThresholdCost)
-                    {
-                        _fixedIter = 0;
-                    }
-                    else
-                    {
-                        _fixedIter++;
+                        bestPreSample.objectiveFuncVal = _trajectorySamples[_bestTrajectoryIdx].objectiveFuncVal;
+                        bestPreSample.state_cost = _trajectorySamples[_bestTrajectoryIdx].state_cost;
+                        bestPreSample.control_cost = _trajectorySamples[_bestTrajectoryIdx].control_cost;
+                        bestPreSample._sampledMaxStep = _trajectorySamples[_bestTrajectoryIdx]._sampledMaxStep;
+                        for (int i = 0; i < _sampleSize; i++)
+                            bestPreSample._sampledAction[i] = _trajectorySamples[_bestTrajectoryIdx]._sampledAction[i];
+
+                        for (int i = 0; i < 4; i++)
+                        {
+                            bestPreSample.targetHoldIds[i] = _trajectorySamples[_bestTrajectoryIdx].targetHoldIds[i];
+                        }
+
+                        bestPreSample._sampledMaxStep = _trajectorySamples[_bestTrajectoryIdx]._sampledMaxStep;
+
+                        mMemory.SaveState(bestPreSample._cSlotStateIdx, _trajectorySamples[_bestTrajectoryIdx]._cSlotStateIdx);
+                        mMemory.SaveState(bestPreSample._startingSlotIndex, _trajectorySamples[_bestTrajectoryIdx]._startingSlotIndex);
+                        for (int _s = 0; _s < _trajectorySamples[_bestTrajectoryIdx]._sampledMaxStep; _s++)
+                        {
+                            mMemory.SaveState(bestPreSample._fromToStates[_s], _trajectorySamples[_bestTrajectoryIdx]._fromToStates[_s]);
+                        }
+
+                        bestPreSample.isReached = _trajectorySamples[_bestTrajectoryIdx].isReached;
                     }
                 }
+
+                //debuggingText.text += ", state cost:" + (_trajectorySamples[_bestTrajectoryIdx].state_cost).ToString("f3");// UnityEngine.Debug.Log();
+
+                _iter++;
+                if (_opt.getBestObjectiveFuncValue() - bestPreSample.objectiveFuncVal > _fixedThresholdCost)
+                {
+                    _fixedIter = 0;
+                }
+                else
+                {
+                    _fixedIter++;
+                }
+                //}
 
                 _controlRigs[GetMasterTrajectoryIdx()].LoadState(bestPreSample._cSlotStateIdx);
 
@@ -1535,8 +1535,11 @@ namespace Assets.ML_Agents.Examples.ClimberScripts
                 //        + _trajectorySamples[_bestTrajectoryIdx].state_cost.ToString("f3") + ", control:" + _trajectorySamples[_bestTrajectoryIdx].control_cost.ToString("f3"));
 
             }
-
-            if ((_iter > _maxOptIter || _fixedIter > _maxFixedOptIter) && _iter > 0 && !_PlayAnimation)
+            else
+            {
+                _controlRigs[GetMasterTrajectoryIdx()].LoadState(bestPreSample._cSlotStateIdx);
+            }
+            if ((_iter > _maxOptIter || _fixedIter > _maxFixedOptIter) && _iter > 0) // && !_PlayAnimation
             {
                 //finalize opt
                 EndOptimization();

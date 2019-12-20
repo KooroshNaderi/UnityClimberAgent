@@ -374,6 +374,6 @@ public class ClimberMechanimRig : HumanoidMecanimRig
 
     public float GetSqForceOnFingers()
     {
-        return 0.0f;
+        return connectBodyParts[2]._joint.currentForce.sqrMagnitude + connectBodyParts[3]._joint.currentForce.sqrMagnitude;
     }
 }

@@ -8,7 +8,7 @@ public class EndBodyPart : MonoBehaviour
     //public int target_hold_id = -1;
     [HideInInspector] public Transform _bodyPartInfo;
     private Rigidbody _locker_body;
-    private Joint _joint;
+    [HideInInspector] public Joint _joint;
 
     public bool IsConnected { get; private set; } = false;
 

@@ -9,6 +9,7 @@ using ICM;
 using System.IO;
 using System.Text;
 using System.Diagnostics;
+using System;
 
 // this code contains the high-level path planner
 // In reinforcement learning manner, the initial state and targeted hands/feet can be altering for each sample
@@ -21,6 +22,9 @@ public class ClimberInterface
     public class UserTrajectoryPoints
     {
         public int cStateID = -1;
+
+        public List<int> _fromToStates = new List<int>();
+
         public int[] target_ids = { -1, -1, -1, -1 };
     }
     
@@ -33,6 +37,7 @@ public class ClimberInterface
     public UserCommandType current_command_type = UserCommandType.UserNone;
 
     List<UserTrajectoryPoints> user_trajectory_points = new List<UserTrajectoryPoints>();
+    Vector2Int cStepAnimation = new Vector2Int(0, 0);
 
     ClimberMechanimRig controlRig;
     SharedMemoryManager memoryManager;
@@ -43,6 +48,7 @@ public class ClimberInterface
 
     int[] init_hold_ids = { -1, -1, -1, -1 };
     int[] target_hold_ids = { -1, -1, -1, -1 };
+    int total_states_saved = 0;
     public ClimberInterface(GameObject iGameInstant, SharedMemoryManager iMemoryManager)
     {
         controlRig = iGameInstant.GetComponentsInChildren<ClimberMechanimRig>()[0];
@@ -51,7 +57,7 @@ public class ClimberInterface
 
         memoryManager = iMemoryManager;
 
-        AddTrajectoryPoint();
+        AddTrajectoryPoint(null);
     }
     
     public bool LoadCurrentState()
@@ -59,11 +65,11 @@ public class ClimberInterface
         return controlRig.LoadState(user_trajectory_points[user_trajectory_points.Count - 1].cStateID);
     }
 
-    public void UpdateTrajectoryPoints(bool isOptimizationDone)
+    public void UpdateTrajectoryPoints(bool isOptimizationDone, LowLevelController.SamplingTrajectoryStr bestSampleTrajectory)
     {
         if (isOptimizationDone)
         {
-            AddTrajectoryPoint();
+            AddTrajectoryPoint(bestSampleTrajectory);
             isTaskCompleted = true;
             current_command_type = UserCommandType.UserNone;
         }
@@ -71,8 +77,10 @@ public class ClimberInterface
         return;
     }
 
-    void CheckForUserInterrupt(int limb_id, int hold_id)
+    void CheckForUserInterrupt(LowLevelController.SamplingTrajectoryStr bestSampleTrajectory)
     {
+        int limb_id = selected_limb;
+        int hold_id = selected_hold;
         if (limb_id < 0)
             return;
 
@@ -81,13 +89,13 @@ public class ClimberInterface
 
         if (current_command_type == UserCommandType.UserForwardSimulate)
         {
-            UpdateTrajectoryPoints(true);
+            UpdateTrajectoryPoints(true, bestSampleTrajectory);
             current_command_type = UserCommandType.UserNone;
         }
         return;
     }
 
-    public void UseInterface(ref SamplingHighLevelPlan _samplePlan)
+    public void UseInterface(ref SamplingHighLevelPlan _samplePlan, LowLevelController.SamplingTrajectoryStr bestSampleTrajectory)
     {
         Vector3 nCameraPos = lookAtPos + camera_pos[0] * (new Vector3(Mathf.Cos(camera_pos[1]), Mathf.Sin(camera_pos[2]), Mathf.Sin(camera_pos[1]))).normalized;
         nCameraPos.y = Mathf.Max(0f, nCameraPos.y);
@@ -184,7 +192,7 @@ public class ClimberInterface
 
         if (Input.GetMouseButtonUp(0))
         {
-            CheckForUserInterrupt(selected_limb, selected_hold);
+            CheckForUserInterrupt(bestSampleTrajectory);
             current_select_state = 0;
             if (selected_limb > -1)
             {
@@ -259,7 +267,7 @@ public class ClimberInterface
         _samplePlan._sampledInitialStateSlotIdx = user_trajectory_points[user_trajectory_points.Count - 1].cStateID;
     }
     
-    void AddTrajectoryPoint()
+    void AddTrajectoryPoint(LowLevelController.SamplingTrajectoryStr bestSampleTrajectory)
     {
         user_trajectory_points.Add(new UserTrajectoryPoints());
         user_trajectory_points[user_trajectory_points.Count - 1].cStateID = memoryManager.GetNextFreeSlotIdx();
@@ -270,6 +278,18 @@ public class ClimberInterface
         {
             user_trajectory_points[user_trajectory_points.Count - 1].target_ids[i] = target_hold_ids[i];
         }
+
+        if (bestSampleTrajectory != null)
+        {
+            for (int i = 0; i < bestSampleTrajectory._sampledMaxStep; i++)
+            {
+                user_trajectory_points[user_trajectory_points.Count - 1]._fromToStates.Add(memoryManager.GetNextFreeSlotIdx());
+
+                memoryManager.SaveState(user_trajectory_points[user_trajectory_points.Count - 1]._fromToStates[i], bestSampleTrajectory._fromToStates[i]);
+            }
+            total_states_saved += user_trajectory_points[user_trajectory_points.Count - 1]._fromToStates.Count;
+        }
+        return;
     }
 
     void RemoveLastTrajectoryPoint()
@@ -279,6 +299,8 @@ public class ClimberInterface
         {
             if (user_trajectory_points.Count > 1)
             {
+                total_states_saved -= user_trajectory_points[user_trajectory_points.Count - 1]._fromToStates.Count;
+
                 user_trajectory_points.RemoveAt(user_trajectory_points.Count - 1);
             }
             else
@@ -303,6 +325,72 @@ public class ClimberInterface
         return;
     }
 
+
+    float current_scroll_value = 0.0f;
+    bool flag_play_loop = true;
+    float time_diff_happens = 0.0f;
+    public float PlayAnimation(float cTime, float scroll_value)
+    {
+        int index_trajectory_points = cStepAnimation[0];
+        int index_state = cStepAnimation[1];
+        int scroll_index_target = Mathf.CeilToInt(total_states_saved * scroll_value);
+        int scroll_index_current = Mathf.CeilToInt(total_states_saved * current_scroll_value); 
+        if (Mathf.Abs(scroll_index_target - scroll_index_current) > 0)
+        {
+            int index_counter = 0;
+            for (int p = 0; p < user_trajectory_points.Count; p++)
+            {
+                if (index_counter + user_trajectory_points[p]._fromToStates.Count < scroll_index_target)
+                {
+                    index_counter += user_trajectory_points[p]._fromToStates.Count;
+                }
+                else
+                {
+                    index_trajectory_points = p;
+                    index_state = scroll_index_target - index_counter;
+                    break;
+                }
+            }
+            current_scroll_value = scroll_value;
+            flag_play_loop = false;
+            time_diff_happens = cTime;
+        }
+
+        if (cTime - time_diff_happens > 2.0f)
+            flag_play_loop = true;
+
+        if (index_trajectory_points < user_trajectory_points.Count)
+        {
+            if (index_state < user_trajectory_points[index_trajectory_points]._fromToStates.Count)
+            {
+                controlRig.LoadState(user_trajectory_points[index_trajectory_points]._fromToStates[index_state]);
+            }
+            else
+            {
+                if (flag_play_loop)
+                {
+                    index_state = 0;
+                    index_trajectory_points++;
+
+                    if (index_trajectory_points >= user_trajectory_points.Count)
+                    {
+                        index_trajectory_points = 0;
+                        scroll_index_target = 0;
+                    }
+                }
+            }
+            if (flag_play_loop)
+            {
+                index_state++;
+                scroll_index_target++;
+            }
+        }
+
+        cStepAnimation[0] = index_trajectory_points;
+        cStepAnimation[1] = index_state;
+        current_scroll_value = (scroll_index_target / (total_states_saved + 1e-6f));
+        return current_scroll_value;
+    }
 }
 
 public class TrajectoryManager : MonoBehaviour
@@ -311,50 +399,55 @@ public class TrajectoryManager : MonoBehaviour
     public const bool tryNetworkConnection = false;
     private const bool _useAutoPhysicsUpdate = false;
 
+    [Header("Interface")]
     public bool useInterface = true;
-
-    public float MaxSampleDis = 0.25f;
-    public float ConnectionThreshold = 0.25f;
-    //public bool UsePPOReward = true;
-    public bool ResetInitState = false;
-    public float PercentFollowRef = 0.8f;
-    public int MaxSampleSize = 100;
-    //public int nTrajectories;// number of trajectories to simulate forward each time
-    public GameObject _instantObj;
     public bool playAnimation = false;
+    //public InputField FileName;
+    public Scrollbar AnimationSlider;
+    public Button SaveButton;
+    public Button LoadButton;
+    public Button PlayButton;
+    public Button PauseButton;
+
+    [Header("Context")]
     public Text textbox;
     public HoldInfo.HoldType targetHoldType = HoldInfo.HoldType.Sphere;
     public bool ToggleRandomizeScene = false;
+    public GameObject _instantObj;
 
+    [Header("Low Level Controller")]
+    //public float MaxSampleDis = 0.25f;
+    public float ConnectionThreshold = 0.25f;
+    //public bool UsePPOReward = true;
+    //public bool ResetInitState = false;
+    //public float PercentFollowRef = 0.8f;
+    //public int MaxSampleSize = 100;
+    //public int nTrajectories;// number of trajectories to simulate forward each time
+    
     [HideInInspector]
     ContextManager mContext;
     SharedMemoryManager mMemory;
     ClimberInterface mClimberInterface = null;
-    
     LowLevelController mController;
     
     bool isTrajectoryManagerInitialized = false;
 
     HighLevelPlanner mHighLevelPlanner = null;
     SamplingHighLevelPlan _samplePlan = new SamplingHighLevelPlan();
-
-    int cStepAnimation = 0;
-
     NetworkManager mNetworkManager = new NetworkManager();
 
+    Text playButtonText;
+    Text loadButtonText;
     // Use this for initialization
     void Start()
     {
-        if (isTrajectoryManagerInitialized)
-            return;
-
         IntializeTrajectoryManager();
-        
-        isTrajectoryManagerInitialized = true;
     }
     
     void Update()
     {
+        float v = AnimationSlider.value;
+
         if (mNetworkManager != null && tryNetworkConnection)
         {
             mNetworkManager.ConnectToLocalHost();
@@ -375,25 +468,33 @@ public class TrajectoryManager : MonoBehaviour
         }
 
         // setting controller properties
-        mController.MaxSampleDis = MaxSampleDis;
-        mController.MaxSampleSize = MaxSampleSize;
-        mController.PercentFollowRef = PercentFollowRef;
+        //mController.MaxSampleDis = MaxSampleDis;
+        //mController.MaxSampleSize = MaxSampleSize;
+        //mController.PercentFollowRef = PercentFollowRef;
         //mController.UsePPOReward = UsePPOReward;
-        mController.PlayAnimation = playAnimation;
-
-        if (mClimberInterface != null)
+        //mController.PlayAnimation = playAnimation;
+        
+        if (!playAnimation)
         {
-            mClimberInterface.UseInterface(ref _samplePlan);
-            if (mClimberInterface.current_command_type == ClimberInterface.UserCommandType.UserNone)
+            if (mClimberInterface != null)
             {
-                mController.ResetOptimization();
-                mClimberInterface.LoadCurrentState();
+                mClimberInterface.UseInterface(ref _samplePlan, mController.GetBestSample());
+                if (mClimberInterface.current_command_type == ClimberInterface.UserCommandType.UserNone)
+                {
+                    mController.ResetOptimization();
+                    mClimberInterface.LoadCurrentState();
+                }
+                else if (mClimberInterface.current_command_type == ClimberInterface.UserCommandType.UserForwardSimulate)
+                {
+                    bool isDone = mController.OptimizeCost(ref _samplePlan);
+                    mClimberInterface.UpdateTrajectoryPoints(isDone, mController.GetBestSample());
+                }
             }
-            else if (mClimberInterface.current_command_type == ClimberInterface.UserCommandType.UserForwardSimulate)
-            {
-                bool isDone = mController.OptimizeCost(ref _samplePlan);
-                mClimberInterface.UpdateTrajectoryPoints(isDone);
-            }
+        }
+        else
+        {
+            v = mClimberInterface.PlayAnimation(Time.time, v);
+            AnimationSlider.value = v;
         }
         // this should be moved to the low-level controller
         //if (UseAutoPhysicsUpdate)
@@ -457,9 +558,11 @@ public class TrajectoryManager : MonoBehaviour
         //drawStar(_controlRigs[GetMasterTrajectoryIdx()].getEndBonePosition(2) + _controlRigs[GetMasterTrajectoryIdx()].initialBiasPosition);
         //drawStar(_controlRigs[GetMasterTrajectoryIdx()].getEndBonePosition(3) + _controlRigs[GetMasterTrajectoryIdx()].initialBiasPosition);
 
-        textbox.text = Time.time.ToString() + "\n State Cost: " + (-mController.GetBestSampleValue()).ToString("f3");
+        textbox.text = "Time: " + Time.time.ToString() + "\n"
+            + "State Cost: " + (-mController.GetBestSampleValue()).ToString("f3") + "\n"
+            + "Slider Value: " + v.ToString("f3");
     }
-
+    
     void drawStar(Vector3 p)
     {
         float s = 0.5f;
@@ -481,6 +584,9 @@ public class TrajectoryManager : MonoBehaviour
 
     public void IntializeTrajectoryManager()
     {
+        if (isTrajectoryManagerInitialized)
+            return;
+
         Time.fixedDeltaTime = 1 / 100.0f;
 
         mMemory = new SharedMemoryManager();
@@ -495,7 +601,7 @@ public class TrajectoryManager : MonoBehaviour
         else
             mHighLevelPlanner = new HighLevelPlanner(mController, mMemory);
 
-        
+
         //    
 
         //    _samplePlan._sampledInitialStateSlotIdx = -1;
@@ -507,8 +613,33 @@ public class TrajectoryManager : MonoBehaviour
 
         //if (flag_test)
         //    TestRun();
-        
+
         //mHighLevelPlanner.RandomizeScene(Time.time);
+
+        PlayButton.onClick.AddListener(PlayButtonOnClick);
+
+        playButtonText = PlayButton.GetComponentInChildren<Text>();
+        loadButtonText = LoadButton.GetComponentInChildren<Text>();
+        isTrajectoryManagerInitialized = true;
+    }
+
+    private void PlayButtonOnClick()
+    {
+        if (playButtonText.text == "Play")
+        {
+            playButtonText.text = "Stop";
+            playAnimation = true;
+        }
+        else if (playButtonText.text == "Stop")
+        {
+            playButtonText.text = "Play";
+            playAnimation = false;
+        }
+    }
+
+    void LoadButtonOnClick()
+    {
+        return;
     }
 
     public bool UseAutoPhysicsUpdate

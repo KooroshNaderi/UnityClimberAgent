@@ -88,7 +88,7 @@ namespace Assets.ML_Agents.Examples.SharedAssets.Scripts
             return ret_str;
         }
 
-        public static string ParseArrFloatInToString(float[] stateFeature)
+        public static string ParseArrFloatInToString(float[] stateFeature, char separator = '|')
         {
             string ret_str = "";
 
@@ -97,7 +97,7 @@ namespace Assets.ML_Agents.Examples.SharedAssets.Scripts
                 if (i == stateFeature.Length - 1)
                     ret_str += stateFeature[i].ToString();
                 else
-                    ret_str += stateFeature[i].ToString() + "|";
+                    ret_str += stateFeature[i].ToString() + separator;
             }
 
             return ret_str;

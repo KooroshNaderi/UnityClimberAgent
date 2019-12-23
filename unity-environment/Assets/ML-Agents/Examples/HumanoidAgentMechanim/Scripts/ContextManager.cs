@@ -77,6 +77,56 @@ public class ContextManager : MonoBehaviour
         }
     }
 
+    public string SaveHoldInfoToString(int h)
+    {
+        string info = "";
+        info += ((int)GetHoldType(h)).ToString() + ",";
+
+        Vector3 hold_pos = GetHoldPosition(h);
+        for (int i = 0; i < 3; i++)
+        {
+            info += (hold_pos[i]).ToString("f3") + ",";
+        }
+
+        Quaternion hold_rot = GetHoldRotation(h);
+        for (int i = 0; i < 4; i++)
+        {
+            if (i == 3)
+            {
+                info += (hold_rot[i]).ToString("f3");
+            }
+            else
+            {
+                info += (hold_rot[i]).ToString("f3") + ",";
+            }
+        }
+        return info;
+    }
+
+    public void LoadHoldInfoToString(int h, string info)
+    {
+        List<float> outArr = new List<float>();
+        MyTools.ParseStringIntoFloatArr(info, ref outArr, ',');
+
+        int index = 0;
+        SetHoldType(h, (HoldInfo.HoldType)((int)(outArr[index++])));
+
+        Vector3 hold_pos = new Vector3();
+        for (int i = 0; i < 3; i++)
+        {
+            hold_pos[i] = outArr[index++];
+        }
+        SetHoldPosition(h, hold_pos);
+
+        Quaternion hold_rot = new Quaternion();
+        for (int i = 0; i < 4; i++)
+        {
+            hold_rot[i] = outArr[index++];
+        }
+        SetHoldRotation(h, hold_rot);
+        return;
+    }
+
     public void DeactiveRandomizeFromInterface()
     {
         FlagCanRandomizeFromInterface = false;

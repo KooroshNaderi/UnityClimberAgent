@@ -44,11 +44,16 @@ public class ClimberInterface
     ContextManager masterContext;
 
     bool isTaskCompleted = true;
-    //List<Transform> holdPoses;
 
     int[] init_hold_ids = { -1, -1, -1, -1 };
     int[] target_hold_ids = { -1, -1, -1, -1 };
     int total_states_saved = 0;
+
+    // variables for playing animations
+    float current_scroll_value = 0.0f;
+    bool flag_play_loop = true;
+    float time_diff_happens = 0.0f;
+
     public ClimberInterface(GameObject iGameInstant, SharedMemoryManager iMemoryManager)
     {
         controlRig = iGameInstant.GetComponentsInChildren<ClimberMechanimRig>()[0];
@@ -95,7 +100,9 @@ public class ClimberInterface
         return;
     }
 
-    public void UseInterface(ref SamplingHighLevelPlan _samplePlan, LowLevelController.SamplingTrajectoryStr bestSampleTrajectory)
+    public void UseInterface(ref SamplingHighLevelPlan _samplePlan,
+        LowLevelController.SamplingTrajectoryStr bestSampleTrajectory,
+        bool play_animation)
     {
         Vector3 nCameraPos = lookAtPos + camera_pos[0] * (new Vector3(Mathf.Cos(camera_pos[1]), Mathf.Sin(camera_pos[2]), Mathf.Sin(camera_pos[1]))).normalized;
         nCameraPos.y = Mathf.Max(0f, nCameraPos.y);
@@ -129,6 +136,11 @@ public class ClimberInterface
         if (Mathf.Abs(mouse_scroll_value) > 0)
         {
             camera_pos[0] += -3.0f * mouse_scroll_value;
+        }
+
+        if (play_animation)
+        {
+            return;
         }
 
         RaycastHit hitInfo = new RaycastHit();
@@ -256,6 +268,114 @@ public class ClimberInterface
         return;
     }
 
+    public void SaveToFile()
+    {
+        StreamWriter streamWriter = new StreamWriter("user_scene_trajectory.txt", false);
+
+        // save scene
+        int numHolds = masterContext.GetNumHolds();
+        streamWriter.WriteLine(numHolds.ToString());
+        for (int h = 0; h < numHolds; h++)
+        {
+            streamWriter.WriteLine(masterContext.SaveHoldInfoToString(h));
+        }
+
+        int num_trajectory_points = user_trajectory_points.Count;
+        streamWriter.WriteLine(num_trajectory_points.ToString());
+
+        // now write num_trajectory_points trajectory points
+        for (int i = 0; i < num_trajectory_points; i++)
+        {
+            // start with head line (num from-to states, target hold ids)
+            string head_line = user_trajectory_points[i]._fromToStates.Count.ToString() + ","
+                             + user_trajectory_points[i].target_ids[0].ToString() + ","
+                             + user_trajectory_points[i].target_ids[1].ToString() + ","
+                             + user_trajectory_points[i].target_ids[2].ToString() + ","
+                             + user_trajectory_points[i].target_ids[3].ToString();
+            streamWriter.WriteLine(head_line);
+            
+            // save current state
+            streamWriter.WriteLine(
+                MyTools.ParseArrFloatInToString(
+                    memoryManager.SaveStateToFloatArr(user_trajectory_points[i].cStateID),
+                    ','));
+            for (int s = 0; s < user_trajectory_points[i]._fromToStates.Count; s++)
+            {
+                streamWriter.WriteLine(
+                MyTools.ParseArrFloatInToString(
+                    memoryManager.SaveStateToFloatArr(user_trajectory_points[i]._fromToStates[s]),
+                    ','));
+            }
+        }
+
+        streamWriter.Flush();
+        streamWriter.Close();
+        return;
+    }
+
+    public void LoadFromFile()
+    {
+        StreamReader streamReader = new StreamReader("user_scene_trajectory.txt");
+
+        // save scene
+        int numHolds = masterContext.GetNumHolds();
+        string line = streamReader.ReadLine();
+        for (int h = 0; h < numHolds; h++)
+        {
+            masterContext.LoadHoldInfoToString(h, streamReader.ReadLine());
+        }
+
+        int num_trajectory_points = (int)(float.Parse(streamReader.ReadLine()));
+
+        List<float> outArr = new List<float>();
+        int c_index = 0;
+        // now load num_trajectory_points trajectory points
+        for (int i = 0; i < num_trajectory_points; i++)
+        {
+            if (i >= user_trajectory_points.Count)
+            {
+                user_trajectory_points.Add(new UserTrajectoryPoints());
+            }
+            // start with head line (num from-to states, target hold ids)
+            string head_line = streamReader.ReadLine();
+
+            MyTools.ParseStringIntoFloatArr(head_line, ref outArr, ','); c_index = 0;
+
+            int from_to_state_count = (int)(outArr[c_index++]);
+
+            user_trajectory_points[i].target_ids[0] = (int)(outArr[c_index++]);
+            user_trajectory_points[i].target_ids[1] = (int)(outArr[c_index++]);
+            user_trajectory_points[i].target_ids[2] = (int)(outArr[c_index++]);
+            user_trajectory_points[i].target_ids[3] = (int)(outArr[c_index++]);
+            
+            // load current state
+            if (user_trajectory_points[i].cStateID < 0)
+            {
+                user_trajectory_points[i].cStateID = memoryManager.GetNextFreeSlotIdx();
+            }
+            MyTools.ParseStringIntoFloatArr(streamReader.ReadLine(), ref outArr, ','); c_index = 0;
+            
+            memoryManager.LoadStateFromList(user_trajectory_points[i].cStateID, ref outArr);
+
+            for (int s = 0; s < from_to_state_count; s++)
+            {
+                if (s >= user_trajectory_points[i]._fromToStates.Count)
+                {
+                    user_trajectory_points[i]._fromToStates.Add(memoryManager.GetNextFreeSlotIdx());
+                }
+                if (user_trajectory_points[i]._fromToStates[s] < 0)
+                {
+                    user_trajectory_points[i]._fromToStates[s] = memoryManager.GetNextFreeSlotIdx();
+                }
+
+                MyTools.ParseStringIntoFloatArr(streamReader.ReadLine(), ref outArr, ','); c_index = 0;
+
+                memoryManager.LoadStateFromList(user_trajectory_points[i]._fromToStates[s], ref outArr);
+            }
+        }
+        return;
+    }
+
     void UpdateSampleHighLevelPlan(ref SamplingHighLevelPlan _samplePlan)
     {
         _samplePlan.startingNodeID = -1;
@@ -324,12 +444,8 @@ public class ClimberInterface
         isTaskCompleted = true;
         return;
     }
-
-
-    float current_scroll_value = 0.0f;
-    bool flag_play_loop = true;
-    float time_diff_happens = 0.0f;
-    public float PlayAnimation(float cTime, float scroll_value)
+    
+    public float PlayAnimation(float cTime, float scroll_value, bool play_in_loop)
     {
         int index_trajectory_points = cStepAnimation[0];
         int index_state = cStepAnimation[1];
@@ -358,6 +474,11 @@ public class ClimberInterface
 
         if (cTime - time_diff_happens > 2.0f)
             flag_play_loop = true;
+
+        if (flag_play_loop)
+        {
+            flag_play_loop = play_in_loop;
+        }
 
         if (index_trajectory_points < user_trajectory_points.Count)
         {
@@ -437,7 +558,8 @@ public class TrajectoryManager : MonoBehaviour
     NetworkManager mNetworkManager = new NetworkManager();
 
     Text playButtonText;
-    Text loadButtonText;
+    Text pauseButtonText;
+    bool play_in_loop = true;
     // Use this for initialization
     void Start()
     {
@@ -473,12 +595,15 @@ public class TrajectoryManager : MonoBehaviour
         //mController.PercentFollowRef = PercentFollowRef;
         //mController.UsePPOReward = UsePPOReward;
         //mController.PlayAnimation = playAnimation;
-        
+
+        if (mClimberInterface != null)
+        {
+            mClimberInterface.UseInterface(ref _samplePlan, mController.GetBestSample(), playAnimation);
+        }
         if (!playAnimation)
         {
             if (mClimberInterface != null)
             {
-                mClimberInterface.UseInterface(ref _samplePlan, mController.GetBestSample());
                 if (mClimberInterface.current_command_type == ClimberInterface.UserCommandType.UserNone)
                 {
                     mController.ResetOptimization();
@@ -493,7 +618,7 @@ public class TrajectoryManager : MonoBehaviour
         }
         else
         {
-            v = mClimberInterface.PlayAnimation(Time.time, v);
+            v = mClimberInterface.PlayAnimation(Time.time, v, play_in_loop);
             AnimationSlider.value = v;
         }
         // this should be moved to the low-level controller
@@ -519,15 +644,11 @@ public class TrajectoryManager : MonoBehaviour
         //          }
         //      }
 
-
-
         ////      if (ResetInitState)
         ////      {
         ////          ResetInitState = false;
         ////          mController.ResetInitialStateSample();
         ////      }
-
-
 
         //if (!playAnimation)
         //{
@@ -601,9 +722,6 @@ public class TrajectoryManager : MonoBehaviour
         else
             mHighLevelPlanner = new HighLevelPlanner(mController, mMemory);
 
-
-        //    
-
         //    _samplePlan._sampledInitialStateSlotIdx = -1;
 
         //    //if (useLowLevelRandomSamples && _samplePlan._sampledInitialStateSlotIdx < 0)
@@ -617,9 +735,12 @@ public class TrajectoryManager : MonoBehaviour
         //mHighLevelPlanner.RandomizeScene(Time.time);
 
         PlayButton.onClick.AddListener(PlayButtonOnClick);
+        PauseButton.onClick.AddListener(PauseButtonOnClick);
+        SaveButton.onClick.AddListener(SaveButtonOnClick);
+        LoadButton.onClick.AddListener(LoadButtonOnClick);
 
         playButtonText = PlayButton.GetComponentInChildren<Text>();
-        loadButtonText = LoadButton.GetComponentInChildren<Text>();
+        pauseButtonText = PauseButton.GetComponentInChildren<Text>();
         isTrajectoryManagerInitialized = true;
     }
 
@@ -637,8 +758,35 @@ public class TrajectoryManager : MonoBehaviour
         }
     }
 
+    private void PauseButtonOnClick()
+    {
+        if (pauseButtonText.text == "Pause")
+        {
+            pauseButtonText.text = "UnPause";
+            play_in_loop = false;
+        }
+        else if (pauseButtonText.text == "UnPause")
+        {
+            pauseButtonText.text = "Pause";
+            play_in_loop = true;
+        }
+    }
+
+    void SaveButtonOnClick()
+    {
+        if (mClimberInterface != null)
+        {
+            mClimberInterface.SaveToFile();
+        }
+        return;
+    }
+
     void LoadButtonOnClick()
     {
+        if (mClimberInterface != null)
+        {
+            mClimberInterface.LoadFromFile();
+        }
         return;
     }
 
@@ -657,7 +805,6 @@ public class TrajectoryManager : MonoBehaviour
     //    return _samplePlan._sampledTargetStanceID;
     //}
 
-
     //void OnApplicationQuit()
     //{
     //    mNetworkManager.Close();
@@ -670,7 +817,6 @@ public class TrajectoryManager : MonoBehaviour
     /// <summary>
     /// testing MAES
     /// </summary>
-    bool flag_test = false;
     double frosen(double[] x, int N)
     {
         double Fit = 0;

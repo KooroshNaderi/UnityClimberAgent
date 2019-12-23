@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 using System.IO;
+using Assets.ML_Agents.Examples.SharedAssets.Scripts;
 
 public class HumanoidMecanimRig : MonoBehaviour
 {
@@ -501,6 +502,41 @@ public class HumanoidMecanimRig : MonoBehaviour
         public int GetBoneCount()
         {
             return boneCount;
+        }
+
+        public void SaveStateToList(ref List<float> outState)
+        {
+            for (int i = 0; i < boneCount; i++)
+            {
+                MyTools.PushStateFeature(ref outState, pos[i]);
+                MyTools.PushStateFeature(ref outState, rot[i]);
+                MyTools.PushStateFeature(ref outState, vel[i]);
+                MyTools.PushStateFeature(ref outState, aVel[i]);
+            }
+
+            for (int i = 0; i < nAngle; i++)
+            {
+                MyTools.PushStateFeature(ref outState, currentSetAngles[i]);
+            }
+
+            return;
+        }
+
+        public int LoadStateFromList(int c_index, ref List<float> outState)
+        {
+            for (int i = 0; i < boneCount; i++)
+            {
+                c_index = MyTools.LoadFromList(c_index, ref outState, ref pos[i]);
+                c_index = MyTools.LoadFromList(c_index, ref outState, ref rot[i]);
+                c_index = MyTools.LoadFromList(c_index, ref outState, ref vel[i]);
+                c_index = MyTools.LoadFromList(c_index, ref outState, ref aVel[i]);
+            }
+
+            for (int i = 0; i < nAngle; i++)
+            {
+                c_index = MyTools.LoadFromList(c_index, ref outState, ref currentSetAngles[i]);
+            }
+            return c_index;
         }
 
         public Quaternion GetBoneAngle(int b) { return rot[b]; }

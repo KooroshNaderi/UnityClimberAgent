@@ -55,7 +55,7 @@ namespace Assets.ML_Agents.Examples.SharedAssets.Scripts
         {
             return savedStates[_memoryIdx].end_bodies_pos[boneId];
         }
-
+        
         //public Vector3 GetVel(int _memoryIdx, int boneId)
         //{
         //    return savedStates[_memoryIdx].Vel(boneId);
@@ -89,15 +89,22 @@ namespace Assets.ML_Agents.Examples.SharedAssets.Scripts
             return true; // successful saving
         }
 
-        //public void LoadStateFromList(int _freeSlotIdx, ref List<float> inList)
-        //{
-        //    if (!(_freeSlotIdx >= 0 && _freeSlotIdx < savedStates.Count))
-        //    {
-        //        return;
-        //    }
-        //    //savedStates[_freeSlotIdx].LoadStateFromList(ref inList);
-        //}
-        
+        public float[] SaveStateToFloatArr(int stateIdx)
+        {
+            List<float> outState = new List<float>();
+            savedStates[stateIdx].SaveStateToList(ref outState);
+            return outState.ToArray();
+        }
+
+        public void LoadStateFromList(int _freeSlotIdx, ref List<float> inList)
+        {
+            if (!(_freeSlotIdx >= 0 && _freeSlotIdx < savedStates.Count))
+            {
+                return;
+            }
+            savedStates[_freeSlotIdx].LoadStateFromList(ref inList);
+        }
+
         //public void GetFeatureState(int stateIdx, ref List<float> outState, ref int[] tHolds, ref Vector3[] tHoldPoses, int[] boneIndices)
         //{
         //    //_case_study _Study = _case_study.full_body_one_step_action;
@@ -357,13 +364,6 @@ namespace Assets.ML_Agents.Examples.SharedAssets.Scripts
 
         //    return;
         //}
-
-        //public void GetState(int stateIdx, ref List<float> outState)
-        //{
-        //    //savedStates[stateIdx].SaveStateToList(ref outState);
-        //    //return;
-        //}
-
     };
 
 

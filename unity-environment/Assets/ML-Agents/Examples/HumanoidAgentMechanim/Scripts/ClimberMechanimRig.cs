@@ -61,6 +61,89 @@ public class ClimberMechanimRig : HumanoidMecanimRig
             return;
         }
 
+        public void SaveStateToList(ref List<float> outState)
+        {
+            if (outState == null)
+            {
+                outState = new List<float>();
+            }
+            // save humanoid bones state
+            HumanoidBodyState.SaveStateToList(ref outState);
+
+            // now save current stance ids and positions
+            for (int h = 0; h < 4; h++)
+            {
+                MyTools.PushStateFeature(ref outState, hold_bodies_ids[h]);
+                MyTools.PushStateFeature(ref outState, current_hold_pos[h]);
+                MyTools.PushStateFeature(ref outState, current_hold_rot[h]);
+                MyTools.PushStateFeature(ref outState, (int)current_hold_type[h]);
+
+                MyTools.PushStateFeature(ref outState, end_bodies_pos[h]);
+            }
+            // save hip position
+            MyTools.PushStateFeature(ref outState, hipLocation);
+
+            // save connector info
+            for (int b = 0; b < 4; b++)
+            {
+                MyTools.PushStateFeature(ref outState, connectorPos[b]);
+                MyTools.PushStateFeature(ref outState, connectorRot[b]);
+                MyTools.PushStateFeature(ref outState, connectorVel[b]);
+                MyTools.PushStateFeature(ref outState, connectorAVel[b]);
+            }
+            
+            // save spline values
+            for (int i = 0; i < humanoid_action_dof; i++)
+            {
+                MyTools.PushStateFeature(ref outState, spline_init_values[i][0]);
+                MyTools.PushStateFeature(ref outState, spline_init_values[i][1]);
+            }
+            return;
+        }
+
+        public void LoadStateFromList(ref List<float> outState)
+        {
+            int c_index = 0;
+            // load humanoid bones state
+            c_index = HumanoidBodyState.LoadStateFromList(c_index, ref outState);
+
+            // now load current stance ids and positions
+            for (int h = 0; h < 4; h++)
+            {
+                float val = 0.0f;
+                c_index = MyTools.LoadFromList(c_index, ref outState, ref val);
+                hold_bodies_ids[h] = (int)val;
+                c_index = MyTools.LoadFromList(c_index, ref outState, ref current_hold_pos[h]);
+                c_index = MyTools.LoadFromList(c_index, ref outState, ref current_hold_rot[h]);
+                c_index = MyTools.LoadFromList(c_index, ref outState, ref val);
+                current_hold_type[h] = (HoldInfo.HoldType)((int)val);
+
+                c_index = MyTools.LoadFromList(c_index, ref outState, ref end_bodies_pos[h]);
+            }
+            // load hip position
+            c_index = MyTools.LoadFromList(c_index, ref outState, ref hipLocation);
+
+            // load connector info
+            for (int b = 0; b < 4; b++)
+            {
+                c_index = MyTools.LoadFromList(c_index, ref outState, ref connectorPos[b]);
+                c_index = MyTools.LoadFromList(c_index, ref outState, ref connectorRot[b]);
+                c_index = MyTools.LoadFromList(c_index, ref outState, ref connectorVel[b]);
+                c_index = MyTools.LoadFromList(c_index, ref outState, ref connectorAVel[b]);
+            }
+
+            // load spline values
+            for (int i = 0; i < humanoid_action_dof; i++)
+            {
+                float val = 0.0f;
+                c_index = MyTools.LoadFromList(c_index, ref outState, ref val);
+                spline_init_values[i][0] = val;
+                c_index = MyTools.LoadFromList(c_index, ref outState, ref val);
+                spline_init_values[i][1] = val;
+            }
+            return;
+        }
+
         public HumanoidBodyState HumanoidBodyState = new HumanoidBodyState();
 
         public int[] hold_bodies_ids = { -1, -1, -1, -1 };
